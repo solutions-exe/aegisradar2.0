@@ -1,0 +1,64 @@
+@import "tailwindcss";
+@import "tailwindbase";
+@import "tailwindcomponents";
+@import "tailwindutilities";
+
+:root {
+  --background: #008080;
+  --foreground: #000000;
+}
+
+theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: #008080;
+  color: #000000;
+  font-family: 'Courier New', Courier, monospace;
+  overflow: hidden;
+}
+
+/* ── Win95 global scrollbars ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c0c0c0 #c0c0c0;
+}
+
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: #c0c0c0;
+  border-left: 1px solid #808080;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-style: solid;
+  border-width: 2px;
+  border-color: white white #808080 #808080;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d4d4d4;
+}
+
+::-webkit-scrollbar-button {
+  display: block;
+  background: #c0c0c0;
+  border-style: solid;
+  border-width: 2px;
+  border-color: white white #808080 #808080;
+  height: 16px;
+  width: 16px;
+}
+
+::-webkit-scrollbar-corner {
+  background: #c0c0c0;
+}

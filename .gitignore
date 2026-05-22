@@ -1,0 +1,58 @@
+# ========================================
+# AEGIS RADAR - .gitignore
+# ========================================
+
+.next/
+node_modules
+
+# Frontend
+frontend/aegis-radar-app/node_modules/
+frontend/aegis-radar-app/.next/
+frontend/aegis-radar-app/out/
+frontend/aegis-radar-app/build/
+frontend/aegis-radar-app/.env*
+frontend/aegis-radar-app/*.log
+frontend/aegis-radar-app/node_modules/
+frontend/aegis-radar-app/.next/
+
+# Backend
+backend/app/venv/
+backend/app/env/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.pytest_cache/
+backend/models/                  # Trained ML models
+backend/scripts/train_models.py
+backend/scripts/generate_data.py
+backend/app/detection/           # ML core
+backend/node_modules/
+backend/.next/
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary
+*.tmp
