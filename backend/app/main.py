@@ -34,26 +34,25 @@ async def root():
         "timestamp": datetime.utcnow().isoformat()
     }
 
-
 @app.post("/detect")
-async def fraud_detection(tx: Transaction):
+async def fraud_detection(tx: dict):
     """
-    TEMPORARY MOCK ENDPOINT
-    ML Model has been removed for security reasons during sharing/demo.
+    Mock fraud detection - accepts any dict and returns result
     """
-    # Simple rule-based mock (no real ML)
-    is_fraud = tx.amount > 7000 or "test" in (getattr(tx, 'merchant', '') or "").lower()
-    
+    amount = tx.get("amount", 0)
+    is_fraud = amount > 7000
+
     return {
-        "transaction_id": getattr(tx, "transaction_id", "TX-MOCK"),
-        "risk_score": 0.88 if is_fraud else 0.15,
+        "transaction_id": tx.get("transaction_id", f"TX-{int(datetime.utcnow().timestamp())}"),
+        "merchant": tx.get("merchant", "Unknown"),
+        "amount": amount,
+        "risk_score": 0.88 if is_fraud else 0.22,
         "is_fraud": is_fraud,
-        "confidence": 0.85 if is_fraud else 0.78,
+        "confidence": 0.92 if is_fraud else 0.75,
         "model_version": "v1.0-mock",
-        "message": "ML engine temporarily disabled for security reasons",
+        "message": "ML engine temporarily disabled for security",
         "timestamp": datetime.utcnow().isoformat()
     }
-
 
 # Include auth router if it exists
 # app.include_router(auth.router, prefix="/auth", tags=["auth"])
