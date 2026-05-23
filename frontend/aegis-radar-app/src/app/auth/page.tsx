@@ -12,7 +12,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
+import AegisLogo from "@/components/aegislogo";
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -829,12 +829,7 @@ export default function AuthPage() {
           style={{ borderBottom: "2px solid #808080", background: "#d8d8d8" }}
         >
           {/* Logo mark */}
-          <InsetPanel
-            className="bg-[#000080] flex items-center justify-center shrink-0"
-            style={{ width: "52px", height: "52px" }}
-          >
-            <span className="font-mono text-white font-bold" style={{ fontSize: "22px" }}>⬡</span>
-          </InsetPanel>
+          <AegisLogo size={56} />
 
           {/* Title + tagline */}
           <div className="flex flex-col">
@@ -937,6 +932,7 @@ export default function AuthPage() {
         {" "}and{" "}
         <Link href="/privacy" className="text-[#002080] underline">Privacy Policy</Link>
       </div>
+
 
       <style>{`
         @keyframes fadeIn {
