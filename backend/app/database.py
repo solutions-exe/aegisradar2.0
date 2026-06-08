@@ -14,10 +14,17 @@ Base = declarative_base()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set!")
+    raise ValueError("❌ DATABASE_URL environment variable is not set!")
 
-engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,      # Helps with Render's connection issues
+    pool_recycle=3600
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 
 # ========================== MODELS ==========================
