@@ -9,14 +9,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("🛡️  AEGIS RADAR Backend Server")
-    print("🚀 Running on http://127.0.0.1:8000")
-    print("=" * 60)
+    port = int(os.getenv("PORT", 8000))   # Render requires this
+    
+    print("🛡️ Aegis Radar API is running")
+    print(f"   Listening on port: {port}")
     
     uvicorn.run(
-        "app.main:app", 
-        host="127.0.0.1", 
-        port=8000, 
-        reload=True
+        "app.main:app",
+        host="0.0.0.0",      # Important: Bind to all interfaces
+        port=port,
+        reload=False          # Disable reload in production
     )

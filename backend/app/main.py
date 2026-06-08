@@ -35,6 +35,7 @@ from pathlib import Path
 import joblib
 from dotenv import load_dotenv
 
+
 # Add project root to path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
@@ -95,10 +96,11 @@ if xgboost_fraud is not None or isolation_forest is not None:
     print("✅ Ensemble v2.0 initialized")
     
 app = FastAPI(
-    title="AEGIS RADAR",
-    description="AI-Powered Real-time Fraud Detection System",
-    version="2.1",
+    title="Aegis Radar",
+    description="AI-Powered Fraud Detection System",
+    version="3.3.3"
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -540,8 +542,8 @@ async def get_transactions(limit: int = 200, db: Session = Depends(get_db)):
     ]
 
 
+
+
 if __name__ == "__main__":
     import uvicorn
-
-    print("🛡️ Aegis Radar API is running on http://127.0.0.1:8000")
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
