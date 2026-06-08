@@ -222,7 +222,7 @@ function NotificationRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const token_ = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-const wsUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://127.0.0.1:8000/api/ws/alerts?token=${token_}`;
+const wsUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
 const ws_ = new WebSocket(wsUrl);
 const MAX_STORED = 50;
 const TOAST_DURATION_MS = 5000;
