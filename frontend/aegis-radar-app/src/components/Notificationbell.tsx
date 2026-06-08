@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/auth"; // adjust path if needed
+import { getToken } from '@/lib/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,7 +221,7 @@ function NotificationRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const token_ = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
+const token_ = getToken();
 const wsUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
 const ws_ = new WebSocket(wsUrl);
 const MAX_STORED = 50;
