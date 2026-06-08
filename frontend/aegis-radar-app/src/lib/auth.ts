@@ -1,4 +1,4 @@
-﻿export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+﻿export const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 const AUTH_KEYS = ['token', 'role', 'user_email', 'user_name', 'organization_id'] as const;
 
@@ -27,21 +27,29 @@ export type RegisterPayload = {
   industry?: string;
 };
 
-export const auth = {
-  // Save token
-  setToken(token: string) {
+// get auth token
+export const auth = { 
+  getToken : (): string | null => {
+  if (typeof window === "undefined") {
+    return null; // Running on server
+  }
+  return localStorage.getItem(TOKEN_KEY) ||  sessionStorage.getItem(TOKEN_KEY);
+  },
+
+  // set auth token
+setToken : (token: string) => {
+  if (typeof window !== "undefined") {
     localStorage.setItem(TOKEN_KEY, token);
-  },
+  }
+},
 
-  // Get token
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
-  },
-
-  // Remove token (logout)
-  logout() {
+// remove auth token
+logout : () => {
+  if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
-  },
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
+},
 
   // Check if logged in
   isLoggedIn(): boolean {
