@@ -223,7 +223,7 @@ function NotificationRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const token_ = getToken();
-const wsUrl = API_BASE ? `${API_BASE.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
+const wsUrl = API_BASE ? `${API_BASE.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `wss://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
 const ws_ = new WebSocket(wsUrl);
 const MAX_STORED = 50;
 const TOAST_DURATION_MS = 5000;
