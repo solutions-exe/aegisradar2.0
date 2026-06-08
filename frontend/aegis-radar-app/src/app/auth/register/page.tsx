@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { persistAuth, registerUser } from '@/lib/auth';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
     password: '',
-    role: 'analyst'
+    role: 'Analyst',
+    organization_name: '',
+    industry: 'ecommerce',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,22 +24,11 @@ export default function RegisterPage() {
     setError('');
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        alert('Registration successful! Please login.');
-        router.push('/auth/login');
-      } else {
-        setError(data.detail || 'Registration failed');
-      }
+      const auth = await registerUser(formData);
+      persistAuth(auth);
+      router.push('/dashboard');
     } catch (err) {
-      setError('Connection error');
+      setError(err instanceof Error ? err.message : 'Unable to create your account right now.');
     } finally {
       setLoading(false);
     }
@@ -52,11 +44,11 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="space-y-6">
           <div>
-            <label className="block text-sm mb-2 text-gray-400">USERNAME</label>
+            <label className="block text-sm mb-2 text-gray-400">FULL NAME</label>
             <input
               type="text"
-              value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
               required
             />
@@ -67,7 +59,7 @@ export default function RegisterPage() {
             <input
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
               required
             />
@@ -78,9 +70,30 @@ export default function RegisterPage() {
             <input
               type="password"
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-2 text-gray-400">ORGANIZATION NAME</label>
+            <input
+              type="text"
+              value={formData.organization_name}
+              onChange={(e) => setFormData({ ...formData, organization_name: e.target.value })}
+              className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-2 text-gray-400">INDUSTRY</label>
+            <input
+              type="text"
+              value={formData.industry}
+              onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+              className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
             />
           </div>
 
@@ -88,11 +101,12 @@ export default function RegisterPage() {
             <label className="block text-sm mb-2 text-gray-400">ROLE</label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
             >
-              <option value="analyst">Analyst</option>
-              <option value="admin">Administrator</option>
+              <option value="Analyst">Analyst</option>
+              <option value="Admin">Admin</option>
+              <option value="Viewer">Viewer</option>
             </select>
           </div>
 

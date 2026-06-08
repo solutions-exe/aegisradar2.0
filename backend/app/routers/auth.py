@@ -1,39 +1,130 @@
-﻿from fastapi import APIRouter, HTTPException
-from app.models.auth import UserCreate, UserLogin, Token
-from backend.app.core.auth import get_password_hash, verify_password, create_access_token, fake_users_db
+from ast import Return
+import token
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from typing import Optional
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sympy import python
 
-@router.post("/register")
-async def register(user: UserCreate):
-    if user.username in fake_users_db:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    fake_users_db[user.username] = {
-        "username": user.username,
-        "email": user.email,
-        "hashed_password": hashed_password,
-        "role": user.role
-    }
-    
-    return {"message": "User registered successfully", "role": user.role}
 
-@router.post("/login", response_model=Token)
-async def login(user: UserLogin):
-    db_user = fake_users_db.get(user.username)
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+from app.auth import create_access_token, get_password_hash, verify_password
+from app.database import Organization, User, get_db
+
+router = APIRouter()
+
+ph = PasswordHasher()
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+python
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "Analyst"
+    organization_id: Optional[int] = None   # Optional for now
+
+
+
+
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    email: str
+    name: str
+    organization_id: int | None = None
+
+
+def normalize_role(role: str) -> str:
+    normalized = (role or "Analyst").strip().lower()
+    if normalized == "admin":
+        return "Admin"
+    if normalized == "viewer":
+        return "Viewer"
+    return "Analyst"
+
+
+@router.post("/auth/login", response_model=AuthResponse)
+async def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not ph.verify(user.password_hash, payload.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    token = create_access_token(
+        {"sub": user.email, "role": user.role, "organization_id": user.organization_id}
+    )
+
+    return AuthResponse(
+        access_token=token,
+        role=user.role,
+        email=user.email,
+        name=user.name or user.email.split("@", 1)[0],
+        organization_id=user.organization_id,
+    )
+
+
+@router.post("/auth/register")
+async def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Register new user with secure Argon2id hashing"""
     
-    if not verify_password(user.password, db_user["hashed_password"]):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    
-    access_token = create_access_token(
-        data={"sub": user.username, "role": db_user["role"]}
+    # Check if email already exists
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Hash password using Argon2id (no need for manual truncation)
+    try:
+        password_hash = ph.hash(payload.password)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Password hashing failed")
+
+    new_user = User(
+        name=payload.name,
+        email=payload.email,
+        password_hash=password_hash,
+        role=payload.role or "Analyst",
+        status="Active",
+        organization_id=payload.organization_id  # Change this logic later for proper multi-tenant
+
     )
     
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": db_user["role"]
-    }
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = create_access_token(
+        {"sub": new_user.email, "role": new_user.role, "organization_id": new_user.organization_id}
+    )
+
+    return AuthResponse(
+        access_token=token,
+        role=new_user.role,
+        email=new_user.email,
+        name=new_user.name,
+        organization_id=new_user.organization_id,
+          )
+    

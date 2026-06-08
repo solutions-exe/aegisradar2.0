@@ -12,7 +12,9 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import AegisLogo from "@/components/aegislogo";
+import AegisLogo from "@/components/Aegislogo";
+import { auth, loginUser, persistAuth, registerUser } from "@/lib/auth";
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -375,35 +377,26 @@ function LoginColumn({
     setLoading(true);
     setAlert(null);
 
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 900));
+    try {
+      const auth = await loginUser({
+        email: form.email,
+        password: form.password,
+      });
 
-    // Demo credentials
-    if (form.email === "demo@demo.com" && form.password === "demo") {
+      persistAuth(auth, form.remember);
       setAlert({ msg: "Login successful. Redirecting to dashboard…", type: "success" });
-      setTimeout(() => router.push("/dashboard"), 1200);
-      return;
+      setTimeout(() => router.push("/dashboard"), 900);
+      
+    } catch (error) {
+      setAlert({
+        msg: error instanceof Error ? error.message : "Unable to sign in. Please try again.",
+        type: "error",
+      });
+      
     }
-
-    // Simulate real auth check — treat anything with valid format as success for demo
-    if (isEmail(form.email) && form.password.length >= 1) {
-      setAlert({ msg: "Login successful. Redirecting to dashboard…", type: "success" });
-      setTimeout(() => router.push("/dashboard"), 1200);
-    } else {
-      setAlert({ msg: "Invalid email or password. Please try again.", type: "error" });
-      setLoading(false);
-    }
+    
   }, [form, router]);
 
-  const handleDemo = useCallback(async () => {
-    setForm({ email: "demo@demo.com", password: "demo", remember: false });
-    setErrors({});
-    setLoading(true);
-    setAlert({ msg: "Signing in with demo credentials…", type: "info" });
-    await new Promise((r) => setTimeout(r, 800));
-    setAlert({ msg: "Demo login successful. Redirecting…", type: "success" });
-    setTimeout(() => router.push("/dashboard"), 1000);
-  }, [router]);
 
   return (
     <div
@@ -480,32 +473,7 @@ function LoginColumn({
           >
             ▶ Sign In
           </W95Button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-px" style={{ background: "#b0b0b0" }} />
-            <span className="font-mono text-[9px] text-[#808080]">or</span>
-            <div className="flex-1 h-px" style={{ background: "#b0b0b0" }} />
-          </div>
-
-          <W95Button
-            variant="success"
-            onClick={handleDemo}
-            loading={loading}
-            className="w-full !py-2 !text-[11px]"
-          >
-            ⚡ Quick Demo Login
-          </W95Button>
         </div>
-
-        {/* Demo credentials hint */}
-        <InsetPanel className="bg-black px-3 py-2">
-          <div className="font-mono text-[9px] text-[#00cc00] leading-relaxed">
-            <span style={{ color:"#007700" }}>▶ DEMO CREDENTIALS</span><br />
-            Email:    demo@demo.com<br />
-            Password: demo
-          </div>
-        </InsetPanel>
 
         {/* Switch to register */}
         <div className="mt-auto pt-2" style={{ borderTop: "1px solid #b0b0b0" }}>
@@ -564,10 +532,27 @@ function RegisterColumn({
 
     setLoading(true);
     setAlert(null);
-    await new Promise((r) => setTimeout(r, 1100));
 
-    setAlert({ msg: "Account created successfully! Redirecting to your dashboard…", type: "success" });
-    setTimeout(() => router.push("/dashboard"), 1400);
+    try {
+      const auth = await registerUser({
+        name: form.fullName,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        organization_name: form.orgName,
+        industry: form.industry,
+      });
+
+      persistAuth(auth);
+      setAlert({ msg: "Account created successfully! Redirecting to your dashboard…", type: "success" });
+      setTimeout(() => router.push("/dashboard"), 900);
+    } catch (error) {
+      setAlert({
+        msg: error instanceof Error ? error.message : "Unable to create your account right now.",
+        type: "error",
+      });
+      setLoading(false);
+    }
   }, [form, router]);
 
   return (
@@ -798,7 +783,7 @@ export default function AuthPage() {
         }}
       >
         {/* Window title bar */}
-        <TitleBar title="AEGIS RADAR v2.1 — Authentication  [Secure Login]" />
+        <TitleBar title="AEGIS RADAR V3.3.3 — Authentication  [Secure Login]" />
 
         {/* Menu bar */}
         <div
@@ -829,8 +814,8 @@ export default function AuthPage() {
           style={{ borderBottom: "2px solid #808080", background: "#d8d8d8" }}
         >
           {/* Logo mark */}
-          <AegisLogo size={56} />
-
+          <AegisLogo size={56} variant="full" />
+          
           {/* Title + tagline */}
           <div className="flex flex-col">
             <div className="font-mono font-bold text-black leading-tight" style={{ fontSize: "22px" }}>
@@ -916,11 +901,11 @@ export default function AuthPage() {
             style={{ borderStyle: "solid", borderWidth: "1px",
               borderColor: "#808080 white white #808080" }}
           >
-            ● AEGIS Auth Server — Online
+            ● AEGISRADAR Auth Server — Online
           </div>
           <div className="flex-1" />
           <span className="font-mono text-[9px] text-[#555]">
-            © 2025 AEGIS Systems Ltd. · Cairo, Egypt
+            © 2025 EXE Solutions Ltd. · Cairo, Egypt
           </span>
         </div>
       </div>
@@ -932,7 +917,6 @@ export default function AuthPage() {
         {" "}and{" "}
         <Link href="/privacy" className="text-[#002080] underline">Privacy Policy</Link>
       </div>
-
 
       <style>{`
         @keyframes fadeIn {

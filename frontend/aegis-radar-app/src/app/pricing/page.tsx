@@ -11,8 +11,9 @@
  * No layout.tsx wrapper — fully self-contained with its own shell.
  */
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import Link from "next/link";
+import AegisLogo from "@/components/Aegislogo";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES & DATA
@@ -162,9 +163,9 @@ const FAQ_ITEMS = [
 ];
 
 const SOCIAL_PROOF = [
-  { metric: "62M+",    label: "Transactions analysed"       },
-  { metric: "EGP 4.2B",label: "Fraud value blocked"         },
-  { metric: "97.3%",   label: "Model accuracy"              },
+  { metric: "432K+",    label: "Transactions analysed"       },
+  { metric: "EGP 6.5",label: "Fraud value blocked"         },
+  { metric: "96.3%",   label: "Model accuracy"              },
   { metric: "143",     label: "Active merchants in Egypt"   },
   { metric: "38ms",    label: "Avg. detection latency"      },
 ];
@@ -278,13 +279,13 @@ function Navbar() {
       <div className="flex items-center px-6 py-2 gap-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <InsetPanel className="bg-[#000080] flex items-center justify-center"
+          <InsetPanel className="bg-[#008080] flex items-center justify-center Shrink-0"
             style={{ width:"32px", height:"32px" }}>
-            <span className="font-mono text-white text-xs font-bold">⬡</span>
+            <AegisLogo size={23} variant="mid"/>
           </InsetPanel>
           <div>
             <div className="font-mono text-sm font-bold text-black leading-tight">AEGIS RADAR</div>
-            <div className="font-mono text-[8px] text-[#555]">AI Fraud Detection Platform</div>
+            <div className="font-mono text-[8px] text-[#555]">AI Fraud Detection · Egypt</div>
           </div>
         </div>
 
@@ -327,7 +328,7 @@ function Hero() {
 
       {/* Window chrome wrapper for the hero headline */}
       <div className="w-full max-w-3xl">
-        <TitleBar title="AEGIS RADAR v2.1 — AI-Powered Fraud Detection for Egyptian Businesses" />
+        <TitleBar title="AEGIS-RADAR-V3.3.3 — AI Fraud Detection System [EXE]" />
         <Panel className="px-8 py-10 flex flex-col items-center gap-4">
 
           {/* Badge */}
@@ -335,9 +336,11 @@ function Hero() {
             style={{ background:"#000080", color:"white",
               borderStyle:"solid", borderWidth:"1px",
               borderColor:"white white #808080 #808080" }}>
-            ⬡ NOW SERVING 143+ MERCHANTS ACROSS EGYPT
+            ⬡ First Fraud Detection System Built for Egypt's E-commerce Ecosystem
           </div>
 
+           <AegisLogo size={98} variant="full" showText textSize={32} />
+             
           {/* Headline */}
           <h1 className="font-mono font-bold leading-tight text-black"
             style={{ fontSize:"clamp(22px, 3vw, 34px)" }}>
@@ -371,7 +374,7 @@ function Hero() {
 
       {/* Terminal demo window */}
       <div className="w-full max-w-3xl">
-        <TitleBar title="C:\AEGIS\monitor.exe — Live Transaction Feed (Demo)" />
+        <TitleBar title="C:\AEGISRADAR\monitor.exe — Live Feed (Demo)" />
         <InsetPanel className="bg-black px-4 py-3" style={{ fontFamily:"'Courier New',monospace" }}>
           {[
             { t:"09:14:02", tx:"TX-A3F2K1", m:"Jumia EG",        amt:"EGP  1,240.00", r:"RISK: LOW  → ✓ NORMAL", c:"#00ff00" },
@@ -387,7 +390,7 @@ function Hero() {
             </div>
           ))}
           <div className="font-mono text-[11px] text-[#00ff00] mt-1">
-            C:\AEGIS&gt; <span style={{ display:"inline-block", width:"8px", height:"13px",
+            C:\AEGISRADAR&gt; <span style={{ display:"inline-block", width:"8px", height:"13px",
               background:"#00ff00", verticalAlign:"middle",
               animation:"blink 1.1s step-end infinite" }} />
           </div>
@@ -477,7 +480,7 @@ function PricingSection() {
               <div className="px-4 pt-4 pb-3" style={{ borderBottom:"1px solid #b0b0b0" }}>
                 {plan.price !== null ? (
                   <div className="flex items-baseline gap-1">
-                    <span className="font-mono text-sm text-[#555]">EGP</span>
+                    <span className="font-mono text-sm text-[#333]">EGP</span>
                     <span className="font-mono font-bold leading-none"
                       style={{ fontSize:"36px",
                         color: plan.popular ? "#000080" : "#222" }}>
@@ -594,9 +597,9 @@ function CompareTable() {
               </thead>
               <tbody>
                 {categories.map((cat) => (
-                  <>
+                  <Fragment key={`cat-${cat}`}>
                     {/* Category separator row */}
-                    <tr key={`cat-${cat}`}>
+                    <tr>
                       <td colSpan={4} className="px-3 py-1 font-mono text-[9px] font-bold"
                         style={{ background:"#000080", color:"#88aaff",
                           borderBottom:"1px solid #000060",
@@ -626,7 +629,7 @@ function CompareTable() {
                         </td>
                       </tr>
                     ))}
-                  </>
+                 </Fragment>
                 ))}
               </tbody>
             </table>
@@ -694,7 +697,7 @@ function FAQ() {
 
         <div className="text-center font-mono text-[10px] text-[#555]">
           Still have questions?{" "}
-          <a href="mailto:support@aegisradar.io"
+          <a href="mailto:support@exe.com"
             className="text-[#000080] font-bold" style={{ textDecoration:"underline" }}>
             Email our team
           </a>
@@ -735,7 +738,7 @@ function CTABanner() {
               style={{ padding:"12px 32px", fontSize:"13px" }}>
               ▶ Create Free Account
             </W95Btn>
-            <W95Btn href="mailto:sales@aegisradar.io"
+            <W95Btn href="mailto:sales@exe.com"
               style={{ padding:"12px 32px", fontSize:"13px" }}>
               ✉ Talk to Sales
             </W95Btn>
@@ -761,9 +764,9 @@ function Footer() {
           {/* Brand */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <InsetPanel className="bg-[#000080] flex items-center justify-center"
-                style={{ width:"24px", height:"24px" }}>
-                <span className="font-mono text-white text-[9px] font-bold">⬡</span>
+              <InsetPanel className="bg-[#008080] flex items-center justify-center Shrink-0"
+                style={{ width:"32px", height:"32px" }}>
+                  <AegisLogo size={23} variant="mid" />
               </InsetPanel>
               <span className="font-mono text-sm font-bold text-black">AEGIS RADAR</span>
             </div>
@@ -817,7 +820,7 @@ function Footer() {
         <div className="flex items-center justify-between pt-3"
           style={{ borderTop:"1px solid #b0b0b0" }}>
           <span className="font-mono text-[9px] text-[#808080]">
-            © 2025 AEGIS Systems Ltd. · Cairo, Egypt · All rights reserved
+            © 2026 EXE Solutions Ltd. · Cairo, Egypt · All rights reserved
           </span>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[9px] text-[#808080]">

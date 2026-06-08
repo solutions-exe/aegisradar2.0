@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { loginUser, persistAuth } from '@/lib/auth';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,23 +18,11 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        localStorage.setItem('token', data.access_token);
-        localStorage.setItem('role', data.role);
-        router.push('/dashboard');
-      } else {
-        setError(data.detail || 'Login failed');
-      }
+      const auth = await loginUser({ email, password });
+      persistAuth(auth);
+      router.push('/dashboard');
     } catch (err) {
-      setError('Connection error');
+      setError(err instanceof Error ? err.message : 'Unable to sign in right now.');
     } finally {
       setLoading(false);
     }
@@ -48,11 +38,11 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm mb-2 text-gray-400">USERNAME</label>
+            <label className="block text-sm mb-2 text-gray-400">EMAIL</label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-black border border-gray-600 p-4 text-white focus:border-[#00ff46] outline-none font-mono"
               required
             />
@@ -80,8 +70,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-500 mt-8">
-          Demo Mode • Faculty Presentation
+        <p className="text-center mt-6 text-sm">
+          Need an account?{' '}
+          <Link href="/auth" className="text-[#00ff46] hover:underline">
+            Create one here
+          </Link>
         </p>
       </div>
     </div>

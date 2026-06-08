@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import AegisLogo from "@/components/Aegislogo";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WIN95 PRIMITIVES
@@ -124,9 +125,9 @@ function Navbar() {
 
         {/* Logo */}
         <Link href="/" style={{ textDecoration:"none" }} className="flex items-center gap-2">
-          <InsetPanel className="bg-[#000080] flex items-center justify-center shrink-0"
+          <InsetPanel className="bg-[#008080] flex items-center justify-center shrink-0"
             style={{ width:"32px", height:"32px" }}>
-            <span className="font-mono text-white font-bold" style={{ fontSize:"16px" }}>⬡</span>
+            <AegisLogo size={23} variant="mid" />
           </InsetPanel>
           <div>
             <div className="font-mono text-sm font-bold text-black leading-tight">AEGIS RADAR</div>
@@ -159,7 +160,7 @@ function Navbar() {
             Sign In
           </W95Btn>
           <W95Btn href="/auth" variant="primary" style={{ fontSize:"11px", padding:"4px 14px" }}>
-            Get Started Free →
+            Get Started →
           </W95Btn>
         </div>
 
@@ -204,31 +205,20 @@ function Hero() {
       style={{ background:"#c0c0c0" }}>
       <div className="w-full max-w-4xl flex flex-col gap-0">
 
-        <TitleBar title="AEGIS RADAR v2.1  —  AI-Powered Fraud Detection Platform  [Production]" />
+        <TitleBar title="AEGIS-RADAR-V3.3.3 — AI Fraud Detection System [EXE]" />
         <Panel className="px-8 py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-center gap-10">
+          <div className="flex flex-col md:flex-row items-center gap-8">
 
             {/* Left: headline + CTAs */}
             <div className="flex flex-col gap-4 flex-1">
 
-              {/* Live badge */}
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[8px] font-bold px-2 py-px"
-                  style={{ background:"#ddffdd", color:"#006600",
-                    border:"1px solid #006600" }}>
-                  ● LIVE
-                </span>
-                <span className="font-mono text-[9px] text-[#555]">
-                  Protecting 143+ merchants right now
-                </span>
-              </div>
 
               {/* Headline */}
               <h1 style={{ margin:0 }}>
                 <div className="font-mono font-bold text-black leading-tight"
                   style={{ fontSize:"clamp(28px,4vw,46px)" }}>
-                  AEGIS RADAR
                 </div>
+                <AegisLogo size={98} variant="full" showText textSize={32} />
                 <div className="font-mono font-bold leading-tight mt-1"
                   style={{ fontSize:"clamp(14px,2vw,20px)", color:"#000080" }}>
                   Real-time AI Fraud Detection<br />
@@ -278,10 +268,21 @@ function Hero() {
 
             {/* Right: terminal preview window */}
             <div className="flex-1 max-w-sm w-full">
+                {/* Live badge */}
+                <span className="font-mono text-[11px] font-bold px-2 py-px"
+                  style={{ background:"#ddffdd", color:"#006600",
+                    border:"2px solid #006600" }}>
+                  ● LIVE
+                </span>
+                <span className="flex flex-col gap-1 flex-4 font-mono text-[12px] text-[#333]">
+                    ---First Fraud Detection System Built for Egypt's E-commerce Ecosystem---
+                </span>
+
+
               <TitleBar title="monitor.exe — Live Feed" />
               <InsetPanel className="bg-black p-3" style={{ minHeight:"200px" }}>
                 <div className="font-mono text-[9px] text-[#007700] mb-1">
-                  C:\AEGIS&gt; monitor --live
+                  C:\AEGISRADAR&gt; monitor --live
                 </div>
                 {[
                   { t:"09:14:02", tx:"TX-A3F2K",  m:"Jumia EG",     a:"1,240", r:"✓ NORMAL", c:"#00ff00" },
@@ -298,7 +299,7 @@ function Hero() {
                   </div>
                 ))}
                 <div className="font-mono text-[9px] text-[#00ff00] mt-1">
-                  C:\AEGIS&gt;<span style={{ display:"inline-block", width:"7px", height:"12px",
+                  C:\AEGISRADAR&gt;<span style={{ display:"inline-block", width:"7px", height:"12px",
                     background:"#00ff00", verticalAlign:"middle", marginLeft:"3px",
                     animation:"blink 1.1s step-end infinite" }} />
                 </div>
@@ -317,11 +318,11 @@ function Hero() {
 
 function TrustBar() {
   const stats = [
-    { metric:"62M+",     label:"Transactions analysed"      },
-    { metric:"EGP 4.2B", label:"Fraud value blocked"        },
-    { metric:"97.3%",    label:"Detection accuracy"         },
+    { metric:"432K+",     label:"Transactions analysed"      },
+    { metric:"EGP 6.5M+", label:"Fraud value blocked"        },
+    { metric:"96.3%",    label:"Detection accuracy"         },
     { metric:"38ms",     label:"Avg. response time"         },
-    { metric:"99.97%",   label:"Platform uptime (30d)"      },
+    { metric:"98.5%",   label:"Platform uptime (30d)"      },
     { metric:"143+",     label:"Active merchants"           },
   ];
   return (
@@ -510,7 +511,7 @@ function Features() {
                 <div className="mt-auto">
                   <W95Btn href="/auth" variant="primary"
                     style={{ fontSize:"11px", padding:"6px 18px" }}>
-                    Try {f.title} Free →
+                    Try {f.title} →
                   </W95Btn>
                 </div>
               </div>
@@ -520,7 +521,7 @@ function Features() {
                 <TitleBar title={`${f.preview}.exe`} />
                 <InsetPanel className="bg-black p-2" style={{ minHeight:"120px" }}>
                   <div className="font-mono text-[8px] text-[#007700] mb-1">
-                    C:\AEGIS\{f.preview}&gt;
+                    C:\AEGISRADAR\{f.preview}&gt;
                   </div>
                   {f.bullets.map((b, i) => (
                     <div key={i} className="font-mono text-[8px] leading-relaxed"
@@ -609,8 +610,8 @@ function WhyEgypt() {
         {/* Egypt stat callout */}
         <InsetPanel className="bg-[#000080] p-4 flex flex-wrap items-center justify-between gap-4">
           {[
-            { n:"EGP 4.2B+", l:"fraud blocked for Egyptian merchants" },
-            { n:"2.9%",       l:"average fraud rate in Egypt e-commerce" },
+            { n:"EGP 432K+", l:"fraud blocked for Egyptian merchants" },
+            { n:"3.6%",       l:"average fraud rate in Egypt e-commerce" },
             { n:"<24hrs",     l:"average time to go live with AEGIS" },
             { n:"🇪🇬 Cairo",  l:"headquartered & supported locally" },
           ].map((s) => (
@@ -712,10 +713,10 @@ function Testimonials() {
 
 function DemoSection() {
   return (
-    <div id="demo" className="py-12 px-6" style={{ background:"#1a1a2e",
-      borderTop:"2px solid #808080", borderBottom:"2px solid #808080" }}>
+    <div id="demo" className="py-12 px-6" style={{ background:"#000080",
+      borderTop:"2px solid #404080", borderBottom:"2px solid #404080" }}>
       <div className="max-w-4xl mx-auto flex flex-col gap-4">
-        <TitleBar title="C:\AEGIS\dashboard.exe — Interactive Demo Preview" accent="dark" />
+        <TitleBar title="C:\AEGISRADAR\dashboard.exe — Interactive Demo Preview"/>
         <Panel className="p-4 flex flex-col md:flex-row gap-6 items-start">
 
           {/* Left: description */}
@@ -743,7 +744,7 @@ function DemoSection() {
               ))}
             </div>
             <div className="flex gap-2 mt-2">
-              <W95Btn href="/auth" variant="primary"
+              <W95Btn href="/demo" variant="primary"
                 style={{ fontSize:"12px", padding:"8px 20px" }}>
                 ⚡ Launch Demo Dashboard
               </W95Btn>
@@ -791,7 +792,7 @@ function DemoSection() {
 function FinalCTA() {
   return (
     <div style={{ background:"#000080", borderTop:"2px solid #404080" }}>
-      <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col items-center gap-4 text-center">
+        <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col gap-4">
         <TitleBar title="AEGIS RADAR — Protect Your Business Today" />
         <Panel className="w-full px-8 py-10 flex flex-col items-center gap-4">
 
@@ -817,7 +818,7 @@ function FinalCTA() {
               style={{ padding:"12px 32px", fontSize:"14px" }}>
               ▶ Create Free Account
             </W95Btn>
-            <W95Btn href="mailto:sales@aegisradar.io"
+            <W95Btn href="mailto:sales@exe.com"
               style={{ padding:"12px 32px", fontSize:"14px" }}>
               ✉ Talk to Sales
             </W95Btn>
@@ -839,7 +840,7 @@ function FinalCTA() {
               "🇪🇬 Hosted locally",
               "✓ CBE Compliant",
               "✓ GDPR Compliant",
-              "⬡ 99.97% Uptime SLA",
+              "⬡ 98.5% Uptime SLA",
             ].map((t) => (
               <span key={t} className="font-mono text-[9px] text-[#555]">{t}</span>
             ))}
@@ -870,9 +871,9 @@ function Footer() {
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <InsetPanel className="bg-[#000080] flex items-center justify-center shrink-0"
+              <InsetPanel className="bg-[#008080] flex items-center justify-center shrink-0"
                 style={{ width:"28px", height:"28px" }}>
-                <span className="font-mono text-white font-bold" style={{ fontSize:"13px" }}>⬡</span>
+                <AegisLogo size={23} variant="mid" />
               </InsetPanel>
               <span className="font-mono text-sm font-bold text-black">AEGIS RADAR</span>
             </div>
@@ -907,7 +908,7 @@ function Footer() {
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3"
           style={{ borderTop:"1px solid #b0b0b0" }}>
           <span className="font-mono text-[9px] text-[#808080]">
-            © 2025 AEGIS Systems Ltd. · Cairo, Egypt · All rights reserved
+            © 2026 EXE Solutions Ltd. · Cairo, Egypt · All rights reserved
           </span>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-[9px] text-[#808080]">
@@ -953,11 +954,19 @@ export default function LandingPage() {
       </div>
 
       <style>{`
-        @keyframes blink {
-          0%, 100% { opacity:1; }
-          50%       { opacity:0; }
+        @media print {
+          body * { visibility: hidden; }
+          table, table * { visibility: visible; }
+          table { position: absolute; top: 0; left: 0; width: 100%; }
         }
-        html { scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 16px; height: 16px; }
+        ::-webkit-scrollbar-track { background: #c0c0c0; }
+        ::-webkit-scrollbar-thumb {
+          background: #c0c0c0;
+          border-style: solid; border-width: 2px;
+          border-color: white white #808080 #808080;
+        }
+        ::-webkit-scrollbar-corner { background: #c0c0c0; }
       `}</style>
     </div>
   );

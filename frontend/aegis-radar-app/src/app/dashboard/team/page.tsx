@@ -3,14 +3,16 @@
 /**
  * src/app/dashboard/team/page.tsx
  *
- * AEGIS RADAR — Team & Access Management page.
- * Organisation info, user table, role management, invite modal,
- * action confirmation modal, and a role-permissions reference panel.
+ * AEGIS RADAR — Team & Access Management (backend-connected).
  *
- * Lives inside layout.tsx (Win95 shell + sidebar). Fully self-contained.
+ * GET    /api/team              → list team members
+ * POST   /api/team/invite       → invite new member { name, email, role }
+ * PUT    /api/team/{id}/role    → change role       { role }
+ * DELETE /api/team/{id}         → remove member     (Admin only)
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { getToken } from "@/lib/auth"; // adjust path if needed
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -20,124 +22,81 @@ type Role   = "Admin" | "Analyst" | "Viewer";
 type Status = "Active" | "Inactive" | "Pending";
 
 interface TeamMember {
-  id:         string;
+  id:         string | number;
   name:       string;
   email:      string;
   role:       Role;
   lastActive: string;
   status:     Status;
-  avatar:     string; // initials
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STATIC DATA
+// API HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const INITIAL_MEMBERS: TeamMember[] = [
-  {
-    id: "u1", name: "Ahmed Mostafa",   email: "a.mostafa@cib.com.eg",
-    role: "Admin",   lastActive: "Today, 09:14",    status: "Active",   avatar: "AM",
-  },
-  {
-    id: "u2", name: "Sara El-Sayed",   email: "s.elsayed@cib.com.eg",
-    role: "Admin",   lastActive: "Today, 08:52",    status: "Active",   avatar: "SE",
-  },
-  {
-    id: "u3", name: "Omar Khalil",     email: "o.khalil@cib.com.eg",
-    role: "Analyst", lastActive: "Yesterday, 17:30", status: "Active",  avatar: "OK",
-  },
-  {
-    id: "u4", name: "Nour Abdallah",   email: "n.abdallah@cib.com.eg",
-    role: "Analyst", lastActive: "May 14, 11:05",   status: "Active",   avatar: "NA",
-  },
-  {
-    id: "u5", name: "Youssef Hassan",  email: "y.hassan@cib.com.eg",
-    role: "Analyst", lastActive: "May 12, 09:48",   status: "Inactive", avatar: "YH",
-  },
-  {
-    id: "u6", name: "Dina Farouk",     email: "d.farouk@cib.com.eg",
-    role: "Viewer",  lastActive: "May 10, 14:22",   status: "Active",   avatar: "DF",
-  },
-  {
-    id: "u7", name: "Karim Soliman",   email: "k.soliman@cib.com.eg",
-    role: "Viewer",  lastActive: "—",               status: "Pending",  avatar: "KS",
-  },
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const ROLE_PERMISSIONS: Record<Role, { icon: string; color: string; perms: string[] }> = {
-  Admin: {
-    icon: "★", color: "#cc0000",
-    perms: [
-      "Full dashboard access",
-      "Manage team members & roles",
-      "Configure fraud rules & thresholds",
-      "Export data & generate reports",
-      "Access model configuration",
-      "Block IPs, emails, phones",
-      "View billing & subscription",
-    ],
-  },
-  Analyst: {
-    icon: "◆", color: "#cc7700",
-    perms: [
-      "View all transaction data",
-      "Manage fraud alerts & reviews",
-      "Flag & annotate transactions",
-      "Contact customers & merchants",
-      "Export filtered reports",
-      "View analytics & posture scores",
-      "Cannot manage team or billing",
-    ],
-  },
-  Viewer: {
-    icon: "●", color: "#006600",
-    perms: [
-      "Read-only dashboard access",
-      "View live monitor feed",
-      "View analytics & charts",
-      "Cannot take any actions",
-      "Cannot export data",
-      "Cannot manage alerts",
-      "Cannot access team settings",
-    ],
-  },
-};
+function authHeaders(): HeadersInit {
+  const token = getToken();
+  const h: HeadersInit = { "Content-Type": "application/json" };
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
 
-const PLAN_INFO = {
-  name:    "Professional Plan",
-  renewal: "Renews in 12 days",
-  seats:   { used: 7, total: 10 },
-  org:     "CIB Egypt — E-Commerce Division",
-};
+async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers: { ...authHeaders(), ...(opts.headers ?? {}) },
+  });
+  if (res.status === 401) { window.location.href = "/auth"; throw new Error("Unauthorized"); }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    let detail = "";
+    try { detail = JSON.parse(body)?.detail ?? body; } catch { detail = body; }
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : (undefined as unknown as T);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WIN95 PRIMITIVE COMPONENTS
+// ROLE / STATUS DATA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ROLE_COLOR:   Record<Role,   string> = { Admin:"#cc0000", Analyst:"#cc7700", Viewer:"#006600" };
+const ROLE_BG:      Record<Role,   string> = { Admin:"#ffdddd", Analyst:"#fff3cc", Viewer:"#ddffdd" };
+const STATUS_COLOR: Record<Status, string> = { Active:"#006600", Inactive:"#808080", Pending:"#000080" };
+const STATUS_BG:    Record<Status, string> = { Active:"#ddffdd", Inactive:"#e8e8e8", Pending:"#dde8ff" };
+
+const ROLE_PERMISSIONS: Record<Role, string[]> = {
+  Admin:   ["Full dashboard access","Manage team members","Configure fraud rules",
+             "Export data & reports","View billing","Block IPs, emails, phones"],
+  Analyst: ["View all transaction data","View analytics","Manage fraud alerts","Flag transactions",
+             "Contact customers & merchants","Export filtered reports"],
+  Viewer:  ["View Transactions","View analytics & charts","Cannot take any actions",
+             "Cannot export data", "cannot manage alerts"],
+};
+
+const ROLE_ICONS: Record<Role, string> = { Admin:"★", Analyst:"◆", Viewer:"●" };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WIN95 PRIMITIVES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const MONO: React.CSSProperties = { fontFamily: "'Courier New', Courier, monospace" };
 
-function W95Button({
-  children, active, onClick, className = "", disabled, style,
-}: {
+function W95Button({ children, active, onClick, className = "", disabled, style }: {
   children: React.ReactNode; active?: boolean; onClick?: () => void;
   className?: string; disabled?: boolean; style?: React.CSSProperties;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <button onClick={onClick} disabled={disabled}
       className={`select-none cursor-pointer px-3 py-1 text-black bg-[#c0c0c0]
         focus:outline-dotted focus:outline-1 focus:outline-black text-xs
         disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-      style={{
-        ...MONO,
-        borderStyle: "solid", borderWidth: "2px",
-        borderColor: active
-          ? "#808080 #808080 white white"
-          : "white white #808080 #808080",
-        ...style,
-      }}
-    >
+      style={{ ...MONO, borderStyle:"solid", borderWidth:"2px",
+        borderColor: active ? "#808080 #808080 white white" : "white white #808080 #808080",
+        ...style }}>
       {children}
     </button>
   );
@@ -146,17 +105,17 @@ function W95Button({
 function TitleBar({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between px-2 select-none shrink-0"
-      style={{ background: "linear-gradient(to right,#000080,#1084d0)", height: "20px" }}>
+      style={{ background:"linear-gradient(to right,#000080,#1084d0)", height:"20px" }}>
       <span className="text-white text-[10px] font-bold tracking-wide truncate mr-1" style={MONO}>
         {title}
       </span>
       <div className="flex gap-px shrink-0">
-        {["−", "□", "×"].map((b) => (
-          <button key={b}
-            className="select-none text-black bg-[#c0c0c0] font-mono"
-            style={{ fontSize: "8px", width: "14px", height: "12px", borderStyle: "solid",
-              borderWidth: "1px", borderColor: "white white #808080 #808080",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "default" }}>
+        {["−","□","×"].map((b) => (
+          <button key={b} className="select-none text-black bg-[#c0c0c0] font-mono"
+            style={{ fontSize:"8px", width:"14px", height:"12px", cursor:"default",
+              borderStyle:"solid", borderWidth:"1px",
+              borderColor:"white white #808080 #808080",
+              display:"flex", alignItems:"center", justifyContent:"center" }}>
             {b}
           </button>
         ))}
@@ -170,8 +129,8 @@ function Panel({ children, className = "", style }: {
 }) {
   return (
     <div className={`bg-[#c0c0c0] ${className}`}
-      style={{ borderStyle: "solid", borderWidth: "2px",
-        borderColor: "white white #808080 #808080", ...style }}>
+      style={{ borderStyle:"solid", borderWidth:"2px",
+        borderColor:"white white #808080 #808080", ...style }}>
       {children}
     </div>
   );
@@ -182,25 +141,26 @@ function InsetPanel({ children, className = "", style }: {
 }) {
   return (
     <div className={className}
-      style={{ borderStyle: "solid", borderWidth: "2px",
-        borderColor: "#808080 white white #808080", ...style }}>
+      style={{ borderStyle:"solid", borderWidth:"2px",
+        borderColor:"#808080 white white #808080", ...style }}>
       {children}
     </div>
   );
 }
 
-function Section({ title, children, className = "" }: {
-  title: string; children: React.ReactNode; className?: string;
+function W95Input({ value, onChange, placeholder = "", className = "", type = "text" }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+  className?: string; type?: string;
 }) {
   return (
-    <div className={`flex flex-col ${className}`}>
-      <TitleBar title={title} />
-      <Panel className="p-3">{children}</Panel>
-    </div>
+    <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`bg-white text-black text-xs px-1 py-0.5 ${className}`}
+      style={{ ...MONO, borderStyle:"solid", borderWidth:"2px",
+        borderColor:"#808080 white white #808080", outline:"none" }} />
   );
 }
 
-/** Win95 select dropdown */
 function W95Select({ value, onChange, options, className = "" }: {
   value: string; onChange: (v: string) => void;
   options: { value: string; label: string }[]; className?: string;
@@ -208,50 +168,44 @@ function W95Select({ value, onChange, options, className = "" }: {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
       className={`bg-white text-black text-xs px-1 py-0.5 ${className}`}
-      style={{ ...MONO, borderStyle: "solid", borderWidth: "2px",
-        borderColor: "#808080 white white #808080", outline: "none" }}>
+      style={{ ...MONO, borderStyle:"solid", borderWidth:"2px",
+        borderColor:"#808080 white white #808080", outline:"none" }}>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
 }
 
-/** Win95 text input */
-function W95Input({ value, onChange, placeholder = "", className = "" }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function Toast({ message, type, onClose }: {
+  message: string; type: "success"|"error"|"info"; onClose: () => void;
 }) {
+  const bg = type === "success" ? "#000080" : type === "error" ? "#cc0000" : "#444";
   return (
-    <input type="text" value={value} onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`bg-white text-black text-xs px-1 py-0.5 ${className}`}
-      style={{ ...MONO, borderStyle: "solid", borderWidth: "2px",
-        borderColor: "#808080 white white #808080", outline: "none" }} />
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2"
+      style={{ background:bg, color:"white", borderStyle:"solid", borderWidth:"2px",
+        borderColor:"white white #808080 #808080",
+        boxShadow:"2px 2px 0 #000", ...MONO, fontSize:"11px", fontWeight:"bold" }}>
+      {type === "success" ? "✓" : type === "error" ? "⚠" : "ℹ"} {message}
+      <button onClick={onClose}
+        style={{ background:"none", border:"none", color:"white", cursor:"pointer",
+          fontFamily:"monospace", fontSize:"14px", marginLeft:"4px" }}>×</button>
+    </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// COLOUR HELPERS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Modal wrapper ─────────────────────────────────────────────────────────────
 
-const ROLE_COLOR:   Record<Role,   string> = { Admin: "#cc0000", Analyst: "#cc7700", Viewer: "#006600" };
-const ROLE_BG:      Record<Role,   string> = { Admin: "#ffdddd", Analyst: "#fff3cc", Viewer: "#ddffdd" };
-const STATUS_COLOR: Record<Status, string> = { Active: "#006600", Inactive: "#808080", Pending: "#000080" };
-const STATUS_BG:    Record<Status, string> = { Active: "#ddffdd", Inactive: "#e8e8e8", Pending: "#dde8ff" };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODAL: Generic Win95 dialog wrapper
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function Modal({ title, children, onClose, width = 400 }: {
+function Modal({ title, children, onClose, width = 420 }: {
   title: string; children: React.ReactNode; onClose: () => void; width?: number;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      style={{ background:"rgba(0,0,0,0.45)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="flex flex-col"
-        style={{ width: `${width}px`, background: "#c0c0c0", borderStyle: "solid",
-          borderWidth: "2px", borderColor: "white white #808080 #808080",
-          boxShadow: "4px 4px 0 #000" }}>
+      <div style={{ width:`${width}px`, background:"#c0c0c0", borderStyle:"solid",
+        borderWidth:"2px", borderColor:"white white #808080 #808080",
+        boxShadow:"4px 4px 0 #000" }}>
         <TitleBar title={title} />
         {children}
       </div>
@@ -259,87 +213,110 @@ function Modal({ title, children, onClose, width = 400 }: {
   );
 }
 
+// ── Loading pane ──────────────────────────────────────────────────────────────
+
+function LoadingPane() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <InsetPanel className="bg-black px-8 py-5">
+        <div className="font-mono text-[11px] text-[#00ff00]">
+          C:\AEGISRADAR&gt; load team...
+          <span style={{ display:"inline-block", width:"8px", height:"13px",
+            background:"#00ff00", verticalAlign:"middle", marginLeft:"4px",
+            animation:"blink 1s step-end infinite" }} />
+        </div>
+      </InsetPanel>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// MODAL: Add Team Member
+// INVITE MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function AddMemberModal({ onClose, onAdd }: {
-  onClose: () => void;
-  onAdd: (email: string, role: Role) => void;
+function InviteModal({ onClose, onInvited }: {
+  onClose: () => void; onInvited: () => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [role,  setRole]  = useState<Role>("Analyst");
-  const [error, setError] = useState("");
+  const [name,    setName]    = useState("");
+  const [email,   setEmail]   = useState("");
+  const [role,    setRole]    = useState<Role>("Analyst");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
 
-  const handleSubmit = () => {
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
+  const handleSubmit = async () => {
+    if (!name.trim())  { setError("Name is required."); return; }
+    if (!email.trim() || !email.includes("@")) { setError("Valid email required."); return; }
+    setLoading(true); setError("");
+    try {
+      await apiFetch("/api/team/invite", {
+        method: "POST",
+        body: JSON.stringify({ name, email, role }),
+      });
+      onInvited();
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invite failed");
+    } finally {
+      setLoading(false);
     }
-    onAdd(email.trim(), role);
   };
 
   return (
-    <Modal title="Add Team Member — AEGIS RADAR" onClose={onClose} width={420}>
+    <Modal title="Invite Team Member — AEGIS RADAR" onClose={onClose}>
       <div className="p-4 flex flex-col gap-3">
-        {/* Info banner */}
         <InsetPanel className="bg-white p-2">
           <div className="font-mono text-[10px] text-black leading-relaxed">
-            An invitation email will be sent to the address below. The new member
-            will be prompted to create their AEGIS RADAR credentials on first login.
+            An invitation email will be sent. The new member will be prompted to
+            create their AEGIS RADAR credentials on first login.
           </div>
         </InsetPanel>
 
-        {/* Email field */}
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-[10px] font-bold text-black">Email Address</label>
-          <W95Input value={email} onChange={(v) => { setEmail(v); setError(""); }}
-            placeholder="colleague@cib.com.eg" className="w-full" />
-          {error && <span className="font-mono text-[9px] text-[#cc0000]">{error}</span>}
+        {error && (
+          <div className="font-mono text-[9px] font-bold px-2 py-1"
+            style={{ background:"#ffdddd", color:"#cc0000",
+              borderStyle:"solid", borderWidth:"1px", borderColor:"#cc0000" }}>
+            ⚠ {error}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-0.5">
+          <label className="font-mono text-[10px] font-bold text-black">Full Name</label>
+          <W95Input value={name} onChange={setName} placeholder="Ahmed Mostafa" className="w-full" />
         </div>
 
-        {/* Role selector */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
+          <label className="font-mono text-[10px] font-bold text-black">Email Address</label>
+          <W95Input value={email} onChange={setEmail} type="email"
+            placeholder="colleague@company.com.eg" className="w-full" />
+        </div>
+
+        <div className="flex flex-col gap-0.5">
           <label className="font-mono text-[10px] font-bold text-black">Assign Role</label>
           <W95Select value={role} onChange={(v) => setRole(v as Role)}
             options={[
-              { value: "Admin",   label: "Admin — Full access" },
-              { value: "Analyst", label: "Analyst — Manage alerts & reviews" },
-              { value: "Viewer",  label: "Viewer — Read-only access" },
-            ]}
-            className="w-full" />
+              { value:"Admin",   label:"Admin — Full access" },
+              { value:"Analyst", label:"Analyst — Manage alerts" },
+              { value:"Viewer",  label:"Viewer — Read-only" },
+            ]} className="w-full" />
         </div>
 
-        {/* Role description hint */}
-        <div className="p-2" style={{ background: "#d8d8d8", borderStyle: "solid",
-          borderWidth: "1px", borderColor: "#808080 white white #808080" }}>
+        {/* Role hint */}
+        <div className="p-2" style={{ background:"#d8d8d8", borderStyle:"solid",
+          borderWidth:"1px", borderColor:"#808080 white white #808080" }}>
           <div className="font-mono text-[9px] text-[#444] leading-relaxed">
-            <span className="font-bold" style={{ color: ROLE_COLOR[role] }}>
-              {ROLE_PERMISSIONS[role].icon} {role}:
+            <span className="font-bold" style={{ color:ROLE_COLOR[role] }}>
+              {ROLE_ICONS[role]} {role}:
             </span>{" "}
-            {ROLE_PERMISSIONS[role].perms.slice(0, 3).join(" · ")}…
+            {ROLE_PERMISSIONS[role].slice(0,3).join(" · ")}…
           </div>
         </div>
 
-        {/* Seat usage */}
-        <div className="flex items-center gap-2">
-          <div className="font-mono text-[9px] text-[#555]">
-            Seats used: {PLAN_INFO.seats.used} / {PLAN_INFO.seats.total}
-          </div>
-          <div className="flex-1 h-2" style={{ borderStyle: "solid", borderWidth: "1px",
-            borderColor: "#808080 white white #808080", background: "#e0e0e0" }}>
-            <div style={{ width: `${(PLAN_INFO.seats.used / PLAN_INFO.seats.total) * 100}%`,
-              height: "100%", background: "#000080" }} />
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 justify-end pt-1" style={{ borderTop: "1px solid #b0b0b0" }}>
-          <W95Button onClick={onClose}>Cancel</W95Button>
-          <W95Button onClick={handleSubmit} className="!font-bold"
-            style={{ background: "#000080", color: "white",
-              borderColor: "white white #808080 #808080" } as React.CSSProperties}>
-            ✉ Send Invitation
+        <div className="flex gap-2 justify-end pt-1" style={{ borderTop:"1px solid #b0b0b0" }}>
+          <W95Button onClick={onClose} disabled={loading}>Cancel</W95Button>
+          <W95Button onClick={handleSubmit} disabled={loading} className="!font-bold"
+            style={{ background:"#000080", color:"white",
+              borderColor:"white white #808080 #808080" } as React.CSSProperties}>
+            {loading ? "⏳ Sending…" : "✉ Send Invitation"}
           </W95Button>
         </div>
       </div>
@@ -348,53 +325,42 @@ function AddMemberModal({ onClose, onAdd }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MODAL: Confirmation dialog (generic)
+// CHANGE ROLE MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function ConfirmModal({ title, message, onClose }: {
-  title: string; message: string; onClose: () => void;
+function ChangeRoleModal({ member, onClose, onChanged }: {
+  member: TeamMember; onClose: () => void; onChanged: () => void;
 }) {
-  return (
-    <Modal title={title} onClose={onClose} width={380}>
-      <div className="p-4 flex flex-col gap-3">
-        {/* Icon + message */}
-        <div className="flex items-start gap-3">
-          <div className="font-mono text-3xl leading-none" style={{ color: "#000080" }}>ℹ</div>
-          <InsetPanel className="bg-white flex-1 p-2">
-            <div className="font-mono text-[11px] text-black leading-relaxed">{message}</div>
-          </InsetPanel>
-        </div>
-        {/* Demo notice */}
-        <div className="font-mono text-[9px] text-[#808080] text-center"
-          style={{ borderTop: "1px solid #b0b0b0", paddingTop: "6px" }}>
-          This is a demo environment. No changes have been persisted.
-        </div>
-        <div className="flex justify-center">
-          <W95Button onClick={onClose} className="!px-8 !font-bold">OK</W95Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+  const [role,    setRole]    = useState<Role>(member.role);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODAL: Change Role
-// ═══════════════════════════════════════════════════════════════════════════════
+  const handleConfirm = async () => {
+    setLoading(true); setError("");
+    try {
+      await apiFetch(`/api/team/${member.id}/role`, {
+        method: "PUT",
+        body: JSON.stringify({ role }),
+      });
+      onChanged();
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to change role");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-function ChangeRoleModal({ member, onClose, onConfirm }: {
-  member: TeamMember; onClose: () => void;
-  onConfirm: (newRole: Role) => void;
-}) {
-  const [role, setRole] = useState<Role>(member.role);
+  const avatar = (member.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0,2).toUpperCase();
+
   return (
     <Modal title={`Change Role — ${member.name}`} onClose={onClose} width={400}>
       <div className="p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          {/* Avatar */}
-          <div className="font-mono text-xs font-bold text-white flex items-center justify-center shrink-0"
-            style={{ width: "32px", height: "32px", background: "#000080", border: "2px solid #808080" }}>
-            {member.avatar}
-          </div>
+          <InsetPanel className="bg-[#000080] flex items-center justify-center shrink-0"
+            style={{ width:"32px", height:"32px" }}>
+            <span className="font-mono text-white text-[9px] font-bold">{avatar}</span>
+          </InsetPanel>
           <div>
             <div className="font-mono text-xs font-bold text-black">{member.name}</div>
             <div className="font-mono text-[10px] text-[#555]">{member.email}</div>
@@ -404,37 +370,45 @@ function ChangeRoleModal({ member, onClose, onConfirm }: {
         <div className="flex items-center gap-3">
           <span className="font-mono text-[10px] text-[#555]">Current:</span>
           <span className="font-mono text-[10px] font-bold px-2 py-0.5"
-            style={{ background: ROLE_BG[member.role], color: ROLE_COLOR[member.role],
-              border: `1px solid ${ROLE_COLOR[member.role]}` }}>
+            style={{ background:ROLE_BG[member.role], color:ROLE_COLOR[member.role],
+              border:`1px solid ${ROLE_COLOR[member.role]}` }}>
             {member.role}
           </span>
           <span className="font-mono text-[10px] text-[#555]">→ New:</span>
           <W95Select value={role} onChange={(v) => setRole(v as Role)}
             options={[
-              { value: "Admin",   label: "Admin" },
-              { value: "Analyst", label: "Analyst" },
-              { value: "Viewer",  label: "Viewer" },
+              { value:"Admin",   label:"Admin"   },
+              { value:"Analyst", label:"Analyst" },
+              { value:"Viewer",  label:"Viewer"  },
             ]} />
         </div>
 
-        {/* Permission diff hint */}
         <InsetPanel className="bg-black p-2">
           <div className="font-mono text-[9px] text-[#00ff00] font-bold mb-1">
             ▶ {role} PERMISSIONS
           </div>
-          {ROLE_PERMISSIONS[role].perms.map((p, i) => (
-            <div key={i} className="font-mono text-[9px] text-[#00cc00] leading-relaxed">
+          {ROLE_PERMISSIONS[role].map((p, i) => (
+            <div key={i} className="font-mono text-[9px] leading-relaxed"
+              style={{ color: i < 4 ? "#00cc00" : "#cc4444" }}>
               {i < 4 ? "✓" : "✗"} {p}
             </div>
           ))}
         </InsetPanel>
 
-        <div className="flex gap-2 justify-end" style={{ borderTop: "1px solid #b0b0b0", paddingTop: "8px" }}>
-          <W95Button onClick={onClose}>Cancel</W95Button>
-          <W95Button onClick={() => onConfirm(role)} className="!font-bold"
-            style={{ background: "#000080", color: "white",
-              borderColor: "white white #808080 #808080" } as React.CSSProperties}>
-            ✓ Apply Change
+        {error && (
+          <div className="font-mono text-[9px] px-2 py-1"
+            style={{ background:"#ffdddd", color:"#cc0000",
+              borderStyle:"solid", borderWidth:"1px", borderColor:"#cc0000" }}>
+            ⚠ {error}
+          </div>
+        )}
+
+        <div className="flex gap-2 justify-end" style={{ borderTop:"1px solid #b0b0b0", paddingTop:"8px" }}>
+          <W95Button onClick={onClose} disabled={loading}>Cancel</W95Button>
+          <W95Button onClick={handleConfirm} disabled={loading} className="!font-bold"
+            style={{ background:"#000080", color:"white",
+              borderColor:"white white #808080 #808080" } as React.CSSProperties}>
+            {loading ? "⏳ Applying…" : "✓ Apply Change"}
           </W95Button>
         </div>
       </div>
@@ -443,120 +417,85 @@ function ChangeRoleModal({ member, onClose, onConfirm }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ORG HEADER SECTION
+// CONFIRM MODAL (remove / deactivate)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function OrgHeader({ onAddMember }: { onAddMember: () => void }) {
+function ConfirmModal({ title, message, onClose, onConfirm, loading }: {
+  title: string; message: string;
+  onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
   return (
-    <Section title="AEGIS RADAR — Team & Access Management">
-      <div className="flex items-center gap-4 flex-wrap">
-
-        {/* Org logo area */}
-        <InsetPanel className="flex items-center justify-center bg-[#000080] shrink-0"
-          style={{ width: "64px", height: "64px" }}>
-          <span className="font-mono text-white text-2xl font-bold">CIB</span>
-        </InsetPanel>
-
-        {/* Org details */}
-        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-          <div className="font-mono text-base font-bold text-black">{PLAN_INFO.org}</div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Plan badge */}
-            <span className="font-mono text-[10px] font-bold px-2 py-0.5"
-              style={{ background: "#000080", color: "white",
-                borderStyle: "solid", borderWidth: "1px", borderColor: "white white #808080 #808080" }}>
-              ⬡ {PLAN_INFO.name}
-            </span>
-            {/* Renewal notice */}
-            <span className="font-mono text-[10px] text-[#cc7700] font-bold">
-              ⏰ {PLAN_INFO.renewal}
-            </span>
-          </div>
-          {/* Seat bar */}
-          <div className="flex items-center gap-2 mt-1">
-            <span className="font-mono text-[9px] text-[#555]">
-              Team seats: {PLAN_INFO.seats.used} / {PLAN_INFO.seats.total}
-            </span>
-            <div className="w-32 h-2.5" style={{ borderStyle: "solid", borderWidth: "1px",
-              borderColor: "#808080 white white #808080", background: "#e0e0e0" }}>
-              <div style={{ width: `${(PLAN_INFO.seats.used / PLAN_INFO.seats.total) * 100}%`,
-                height: "100%", background: "#000080" }} />
-            </div>
-            <span className="font-mono text-[9px] text-[#555]">
-              {PLAN_INFO.seats.total - PLAN_INFO.seats.used} remaining
-            </span>
-          </div>
+    <Modal title={title} onClose={onClose} width={380}>
+      <div className="p-4 flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="font-mono text-3xl leading-none" style={{ color:"#000080" }}>ℹ</div>
+          <InsetPanel className="bg-white flex-1 p-2">
+            <div className="font-mono text-[11px] text-black leading-relaxed">{message}</div>
+          </InsetPanel>
         </div>
-
-        {/* Right: actions */}
-        <div className="flex flex-col gap-2 items-end shrink-0">
-          <W95Button onClick={onAddMember} className="!font-bold !text-[11px]"
-            style={{ background: "#000080", color: "white",
-              borderColor: "white white #808080 #808080" } as React.CSSProperties}>
-            ✉ Add Team Member
-          </W95Button>
-          <W95Button className="!text-[10px]">
-            ↑ Upgrade Plan
+        <div className="flex justify-end gap-2">
+          <W95Button onClick={onClose} disabled={loading}>Cancel</W95Button>
+          <W95Button onClick={onConfirm} disabled={loading} className="!font-bold"
+            style={{ background:"#cc0000", color:"white",
+              borderColor:"white white #660000 #660000" } as React.CSSProperties}>
+            {loading ? "⏳ Processing…" : "✓ Confirm"}
           </W95Button>
         </div>
       </div>
-    </Section>
+    </Modal>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ROLE PERMISSIONS REFERENCE SIDEBAR
+// ROLE REFERENCE SIDEBAR
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function RoleReference() {
+function RoleReference({ currentUserRole }: { currentUserRole: string }) {
   return (
-    <div className="flex flex-col gap-2" style={{ width: "230px", flexShrink: 0 }}>
+    <div className="flex flex-col gap-2" style={{ width:"220px", flexShrink:0 }}>
+
+      {/* Current user badge */}
+      <div className="flex flex-col">
+        <TitleBar title="Your Access Level" />
+        <Panel className="p-2">
+          <InsetPanel className="bg-[#000080] p-2">
+            <div className="font-mono text-[9px] text-[#88aaff]">SIGNED IN AS</div>
+            <div className="font-mono text-sm font-bold text-white">{currentUserRole || "—"}</div>
+            <div className="font-mono text-[8px] text-[#88aaff] mt-0.5">
+              {currentUserRole === "Admin"
+                ? "Full access · can modify team"
+                : currentUserRole === "Analyst"
+                ? "Can manage alerts & reviews"
+                : "Read-only access"}
+            </div>
+          </InsetPanel>
+        </Panel>
+      </div>
+
+      {/* Role permissions reference */}
       <div className="flex flex-col">
         <TitleBar title="Role Permissions" />
         <Panel className="p-2 flex flex-col gap-2">
-          {(Object.entries(ROLE_PERMISSIONS) as [Role, typeof ROLE_PERMISSIONS[Role]][]).map(([role, info]) => (
+          {(["Admin","Analyst","Viewer"] as Role[]).map((role) => (
             <div key={role}>
-              {/* Role label */}
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="font-mono text-[10px] font-bold" style={{ color: info.color }}>
-                  {info.icon} {role}
+                <span className="font-mono text-[10px] font-bold"
+                  style={{ color:ROLE_COLOR[role] }}>
+                  {ROLE_ICONS[role]} {role}
                 </span>
               </div>
               <InsetPanel className="bg-black p-1.5">
-                {info.perms.map((p, i) => (
+                {ROLE_PERMISSIONS[role].map((p, i) => (
                   <div key={i} className="font-mono text-[8px] leading-relaxed flex gap-1"
-                    style={{ color: i < 5 ? "#00cc00" : "#cc4444" }}>
-                    <span>{i < 5 ? "✓" : "✗"}</span>
+                    style={role === "Admin" ? { color: i < 6 ? "#00cc00" : "#cc4444" } : role === "Analyst" ? { color: i < 4 ? "#00cc00" : "#cc4444" } : { color: i < 2 ? "#00cc00" : "#cc4444" }}>
+                    <span>{role === "Admin" ? (i < 6 ? "✓" : "✗") : role === "Analyst" ? (i < 4 ? "✓" : "✗") : (i < 2 ? "✓" : "✗")}</span>
                     <span>{p}</span>
                   </div>
                 ))}
               </InsetPanel>
-              {role !== "Viewer" && <div className="h-px mt-1.5" style={{ background: "#b0b0b0" }} />}
+              {role !== "Viewer" && <div className="h-px mt-1.5" style={{ background:"#b0b0b0" }} />}
             </div>
           ))}
-        </Panel>
-      </div>
-
-      {/* Audit log teaser */}
-      <div className="flex flex-col">
-        <TitleBar title="Recent Audit Log" />
-        <Panel className="p-0">
-          <InsetPanel className="bg-black p-2">
-            {[
-              { time: "09:14", user: "A.Mostafa",  action: "Blocked IP 41.x.x.x" },
-              { time: "08:52", user: "S.El-Sayed", action: "Rule threshold updated" },
-              { time: "Yesterday", user: "O.Khalil", action: "Flagged TX-A3F2K" },
-              { time: "May 14", user: "N.Abdallah", action: "Exported CSV report" },
-              { time: "May 12", user: "A.Mostafa",  action: "Added user K.Soliman" },
-            ].map((entry, i) => (
-              <div key={i} className="font-mono text-[8px] leading-relaxed"
-                style={{ color: "#00cc00", borderBottom: i < 4 ? "1px solid #001800" : "none" }}>
-                <span style={{ color: "#007700" }}>[{entry.time}]</span>{" "}
-                <span style={{ color: "#00aaff" }}>{entry.user}</span>{" "}
-                {entry.action}
-              </div>
-            ))}
-          </InsetPanel>
         </Panel>
       </div>
     </div>
@@ -567,125 +506,123 @@ function RoleReference() {
 // USERS TABLE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-type ActionType = "changeRole" | "deactivate" | "activate" | "resend";
+type ModalState =
+  | { type: "invite" }
+  | { type: "changeRole"; member: TeamMember }
+  | { type: "remove"; member: TeamMember }
+  | null;
 
-function UsersTable({
-  members,
-  onAction,
-}: {
-  members: TeamMember[];
-  onAction: (member: TeamMember, action: ActionType) => void;
+function UsersTable({ members, isAdmin, onAction }: {
+  members:  TeamMember[];
+  isAdmin:  boolean;
+  onAction: (member: TeamMember, action: "changeRole"|"remove") => void;
 }) {
   return (
     <div className="flex flex-col flex-1 min-w-0">
       <TitleBar title={`Team Members — ${members.length} users`} />
       <Panel className="p-0">
-        <div className="overflow-auto" style={{ maxHeight: "420px" }}>
-          <table className="w-full border-collapse" style={{ minWidth: "530px" }}>
+        <div className="overflow-auto" style={{ maxHeight:"460px" }}>
+          <table className="w-full border-collapse" style={{ minWidth:"620px" }}>
             <colgroup>
-              <col style={{ width: "160px" }} />
-              <col style={{ width: "200px" }} />
-              <col style={{ width: "80px"  }} />
-              <col style={{ width: "140px" }} />
-              <col style={{ width: "80px"  }} />
-              <col style={{ width: "160px" }} />
+              <col style={{ width:"160px" }} />
+              <col style={{ width:"200px" }} />
+              <col style={{ width:"85px"  }} />
+              <col style={{ width:"140px" }} />
+              <col style={{ width:"85px"  }} />
+              <col style={{ width:"160px" }} />
             </colgroup>
-
-            {/* Header */}
-            <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
+            <thead style={{ position:"sticky", top:0, zIndex:1 }}>
               <tr>
-                {["NAME", "EMAIL", "ROLE", "LAST ACTIVE", "STATUS", "ACTIONS"].map((h) => (
+                {["NAME","EMAIL","ROLE","LAST ACTIVE","STATUS","ACTIONS"].map((h) => (
                   <th key={h}
                     className="px-2 py-1 text-left font-mono text-[10px] font-bold text-black bg-[#c0c0c0]"
-                    style={{ borderStyle: "solid", borderWidth: "1px",
-                      borderColor: "white white #808080 #808080", whiteSpace: "nowrap" }}>
+                    style={{ borderStyle:"solid", borderWidth:"1px",
+                      borderColor:"white white #808080 #808080", whiteSpace:"nowrap" }}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-
-            {/* Body */}
             <tbody>
-              {members.map((m, i) => (
-                <tr key={m.id}
-                  style={{ background: i % 2 === 0 ? "#ffffff" : "#f4f4f4" }}
-                  className="hover:bg-[#dde8ff]">
-
-                  {/* Name + avatar */}
-                  <td className="px-2 py-1.5" style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    <div className="flex items-center gap-2">
-                      <div className="font-mono text-[9px] font-bold text-white flex items-center justify-center shrink-0"
-                        style={{ width: "22px", height: "22px", background: "#000080",
-                          border: "1px solid #808080" }}>
-                        {m.avatar}
-                      </div>
-                      <span className="font-mono text-[11px] font-bold text-black">{m.name}</span>
-                    </div>
-                  </td>
-
-                  {/* Email */}
-                  <td className="px-2 py-1.5 font-mono text-[10px] text-[#444]"
-                    style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    {m.email}
-                  </td>
-
-                  {/* Role badge */}
-                  <td className="px-2 py-1.5" style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    <span className="font-mono text-[9px] font-bold px-1.5 py-0.5"
-                      style={{ background: ROLE_BG[m.role], color: ROLE_COLOR[m.role],
-                        border: `1px solid ${ROLE_COLOR[m.role]}` }}>
-                      {ROLE_PERMISSIONS[m.role].icon} {m.role}
-                    </span>
-                  </td>
-
-                  {/* Last active */}
-                  <td className="px-2 py-1.5 font-mono text-[10px] text-[#555]"
-                    style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    {m.lastActive}
-                  </td>
-
-                  {/* Status badge */}
-                  <td className="px-2 py-1.5" style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    <span className="font-mono text-[9px] font-bold px-1.5 py-0.5"
-                      style={{ background: STATUS_BG[m.status], color: STATUS_COLOR[m.status],
-                        border: `1px solid ${STATUS_COLOR[m.status]}` }}>
-                      {m.status === "Active"   ? "● Active"   :
-                       m.status === "Inactive" ? "○ Inactive" : "◌ Pending"}
-                    </span>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-2 py-1" style={{ borderBottom: "1px solid #e0e0e0" }}>
-                    <div className="flex gap-1 flex-wrap">
-                      <W95Button onClick={() => onAction(m, "changeRole")}
-                        className="!text-[9px] !px-1.5 !py-px">
-                        ✎ Role
-                      </W95Button>
-                      {m.status === "Active" && (
-                        <W95Button onClick={() => onAction(m, "deactivate")}
-                          className="!text-[9px] !px-1.5 !py-px"
-                          style={{ color: "#cc0000" } as React.CSSProperties}>
-                          ⊘ Deactivate
-                        </W95Button>
-                      )}
-                      {m.status === "Inactive" && (
-                        <W95Button onClick={() => onAction(m, "activate")}
-                          className="!text-[9px] !px-1.5 !py-px"
-                          style={{ color: "#006600" } as React.CSSProperties}>
-                          ↺ Activate
-                        </W95Button>
-                      )}
-                      {m.status === "Pending" && (
-                        <W95Button onClick={() => onAction(m, "resend")}
-                          className="!text-[9px] !px-1.5 !py-px">
-                          ✉ Resend
-                        </W95Button>
-                      )}
-                    </div>
+              {members.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 font-mono text-xs text-[#808080]">
+                    — No team members found —
                   </td>
                 </tr>
-              ))}
+              )}
+              {members.map((m, i) => {
+                const avatar = (m.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0,2).toUpperCase();
+                return (
+                  <tr key={m.id}
+                    style={{ background: i % 2 === 0 ? "#ffffff" : "#f4f4f4" }}
+                    className="hover:bg-[#dde8ff]">
+
+                    {/* Name */}
+                    <td className="px-2 py-1.5" style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      <div className="flex items-center gap-2">
+                        <InsetPanel className="bg-[#000080] flex items-center justify-center shrink-0"
+                          style={{ width:"22px", height:"22px" }}>
+                          <span className="font-mono text-white text-[9px] font-bold">{avatar}</span>
+                        </InsetPanel>
+                        <span className="font-mono text-[11px] font-bold text-black truncate">
+                          {m.name}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Email */}
+                    <td className="px-2 py-1.5 font-mono text-[10px] text-[#444]"
+                      style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      {m.email}
+                    </td>
+
+                    {/* Role */}
+                    <td className="px-2 py-1.5" style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      <span className="font-mono text-[9px] font-bold px-1.5 py-0.5"
+                        style={{ background:ROLE_BG[m.role], color:ROLE_COLOR[m.role],
+                          border:`1px solid ${ROLE_COLOR[m.role]}` }}>
+                        {ROLE_ICONS[m.role]} {m.role}
+                      </span>
+                    </td>
+
+                    {/* Last active */}
+                    <td className="px-2 py-1.5 font-mono text-[10px] text-[#555]"
+                      style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      {m.lastActive ?? "—"}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-2 py-1.5" style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      <span className="font-mono text-[9px] font-bold px-1.5 py-0.5"
+                        style={{ background:STATUS_BG[m.status], color:STATUS_COLOR[m.status],
+                          border:`1px solid ${STATUS_COLOR[m.status]}` }}>
+                        {m.status === "Active" ? "● Active" :
+                         m.status === "Inactive" ? "○ Inactive" : "◌ Pending"}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-2 py-1" style={{ borderBottom:"1px solid #e0e0e0" }}>
+                      {isAdmin ? (
+                        <div className="flex gap-1 flex-wrap">
+                          <W95Button onClick={() => onAction(m, "changeRole")}
+                            className="!text-[9px] !px-1.5 !py-px">
+                            ✎ Role
+                          </W95Button>
+                          <W95Button onClick={() => onAction(m, "remove")}
+                            className="!text-[9px] !px-1.5 !py-px"
+                            style={{ color:"#cc0000" } as React.CSSProperties}>
+                            ✕ Remove
+                          </W95Button>
+                        </div>
+                      ) : (
+                        <span className="font-mono text-[9px] text-[#aaa]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -698,114 +635,206 @@ function UsersTable({
 // PAGE ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-type ModalState =
-  | { type: "add" }
-  | { type: "changeRole"; member: TeamMember }
-  | { type: "confirm"; title: string; message: string }
-  | null;
-
 export default function TeamPage() {
-  const [members, setMembers] = useState<TeamMember[]>(INITIAL_MEMBERS);
-  const [modal,   setModal]   = useState<ModalState>(null);
+  const [members,         setMembers]         = useState<TeamMember[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState<string | null>(null);
+  const [modal,           setModal]           = useState<ModalState>(null);
+  const [confirmLoading,  setConfirmLoading]  = useState(false);
+  const [toast,           setToast]           = useState<{ msg:string; type:"success"|"error"|"info" } | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState("");
 
-  // ── Action dispatcher ──────────────────────────────────────────────────────
-  const handleAction = (member: TeamMember, action: ActionType) => {
-    if (action === "changeRole") {
-      setModal({ type: "changeRole", member });
-      return;
+  const isAdmin = currentUserRole === "Admin";
+
+  // Read role from auth storage
+  useEffect(() => {
+    const role =
+      localStorage.getItem("role") ??
+      sessionStorage.getItem("role") ?? "";
+    setCurrentUserRole(role);
+  }, []);
+
+  // ── Load team ──────────────────────────────────────────────────────────────
+  const loadTeam = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch<TeamMember[]>("/api/team");
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load team");
+    } finally {
+      setLoading(false);
     }
-    const messages: Record<ActionType, string> = {
-      deactivate: `Action simulated for demo.\n\n"${member.name}" (${member.email}) would be deactivated. They will lose access to AEGIS RADAR immediately and be notified by email.`,
-      activate:   `Action simulated for demo.\n\n"${member.name}" (${member.email}) would be reactivated with their previous role (${member.role}).`,
-      resend:     `Action simulated for demo.\n\nA new invitation email would be sent to "${member.email}". The previous invite link will be invalidated.`,
-      changeRole: "",
-    };
-    setModal({ type: "confirm", title: `${action.charAt(0).toUpperCase() + action.slice(1)} — ${member.name}`, message: messages[action] });
+  }, []);
+
+  useEffect(() => { loadTeam(); }, [loadTeam]);
+
+  const showToast = useCallback((msg: string, type: "success"|"error"|"info") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // ── Remove member ──────────────────────────────────────────────────────────
+  const handleRemoveConfirm = useCallback(async () => {
+    if (modal?.type !== "remove") return;
+    setConfirmLoading(true);
+    try {
+      await apiFetch(`/api/team/${modal.member.id}`, { method:"DELETE" });
+      setModal(null);
+      showToast(`${modal.member.name} has been removed.`, "success");
+      loadTeam();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Remove failed", "error");
+    } finally {
+      setConfirmLoading(false);
+    }
+  }, [modal, loadTeam, showToast]);
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const stats = {
+    active:  members.filter((m) => m.status === "Active").length,
+    pending: members.filter((m) => m.status === "Pending").length,
+    admins:  members.filter((m) => m.role === "Admin").length,
   };
 
-  // ── Add member ─────────────────────────────────────────────────────────────
-  const handleAdd = (email: string, role: Role) => {
-    const nameParts = email.split("@")[0].split(".");
-    const name = nameParts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
-    const avatar = nameParts.map((p) => p[0]?.toUpperCase() ?? "?").join("").slice(0, 2);
-    const newMember: TeamMember = {
-      id: `u${Date.now()}`, name, email, role,
-      lastActive: "—", status: "Pending", avatar,
-    };
-    setMembers((prev) => [...prev, newMember]);
-    setModal({ type: "confirm", title: "Invitation Sent", message: `Action simulated for demo.\n\nAn invitation has been sent to "${email}" with the role "${role}". They will appear as Pending until they accept.` });
-  };
-
-  // ── Role change ────────────────────────────────────────────────────────────
-  const handleRoleChange = (member: TeamMember, newRole: Role) => {
-    setMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, role: newRole } : m));
-    setModal({ type: "confirm", title: "Role Updated", message: `Action simulated for demo.\n\n"${member.name}" role has been updated from ${member.role} → ${newRole}. Permissions take effect on next login.` });
-  };
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col overflow-y-auto" style={{ ...MONO, background: "#c0c0c0" }}>
+    <div className="flex flex-col overflow-y-auto" style={{ ...MONO, background:"#c0c0c0" }}>
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className="flex items-center gap-2 px-2 py-1.5 shrink-0"
-        style={{ borderBottom: "2px solid #808080", background: "#c0c0c0" }}>
-        <W95Button className="!text-[10px]">💾 Export Roster</W95Button>
+        style={{ borderBottom:"2px solid #808080", background:"#c0c0c0" }}>
+        {isAdmin && (
+          <W95Button onClick={() => setModal({ type:"invite" })}
+            className="!font-bold !text-[10px]"
+            style={{ background:"#000080", color:"white",
+              borderColor:"white white #808080 #808080" } as React.CSSProperties}>
+            ✉ Invite Member
+          </W95Button>
+        )}
+        <W95Button onClick={loadTeam} className="!text-[10px]">🔄 Refresh</W95Button>
         <W95Button className="!text-[10px]" onClick={() => window.print()}>🖨 Print</W95Button>
-        <div className="w-px h-4 bg-[#808080] mx-1" />
-        <W95Button className="!text-[10px]">🔒 Security Policy</W95Button>
-        <W95Button className="!text-[10px]">📋 Audit Log</W95Button>
         <div className="flex-1" />
         <span className="font-mono text-[10px] text-[#444]">
-          Org: CIB Egypt &nbsp;|&nbsp; {members.filter((m) => m.status === "Active").length} active users &nbsp;|&nbsp; May 17, 2025
+          {stats.active} active · {stats.pending} pending · {stats.admins} admins
+          &nbsp;|&nbsp; {new Date().toLocaleDateString("en-GB")}
         </span>
       </div>
 
-      {/* ── Page content ── */}
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-3 p-3 mx-3 mt-3"
+          style={{ background:"#ffdddd", borderStyle:"solid", borderWidth:"2px",
+            borderColor:"#cc0000 #cc0000 #cc0000 #cc0000" }}>
+          <span className="text-base">⚠</span>
+          <div className="flex-1">
+            <div className="font-mono text-[10px] font-bold text-[#880000]">Failed to load team</div>
+            <div className="font-mono text-[9px] text-[#880000]">{error}</div>
+          </div>
+          <W95Button onClick={loadTeam} className="!text-[10px] shrink-0">↺ Retry</W95Button>
+        </div>
+      )}
+
+      {/* Page content */}
       <div className="flex flex-col gap-3 p-3">
 
         {/* Org header */}
-        <OrgHeader onAddMember={() => setModal({ type: "add" })} />
+        <div className="flex flex-col">
+          <TitleBar title="AEGIS RADAR — Team & Access Management" />
+          <Panel className="p-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <InsetPanel className="bg-[#000080] flex items-center justify-center shrink-0"
+                style={{ width:"56px", height:"56px" }}>
+                <span className="font-mono text-white font-bold" style={{ fontSize:"20px" }}>
+                  BFCAI
+                </span>
+              </InsetPanel>
+              <div className="flex flex-col gap-1 flex-1">
+                <div className="font-mono text-base font-bold text-black">
+                  BFCAI IS-Depatment
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[10px] font-bold px-2 py-0.5"
+                    style={{ background:"#000080", color:"white",
+                      borderStyle:"solid", borderWidth:"1px",
+                      borderColor:"white white #808080 #808080" }}>
+                    ⬡ Professional Plan
+                  </span>
+                  <span className="font-mono text-[10px] font-bold"
+                    style={{ color: currentUserRole === "Admin" ? "#cc0000" : "#006600" }}>
+                    Your role: {currentUserRole || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-[9px] text-[#555]">
+                    {members.length} / 10 seats used
+                  </span>
+                  <div className="w-32 h-2.5"
+                    style={{ borderStyle:"solid", borderWidth:"1px",
+                      borderColor:"#808080 white white #808080", background:"#e0e0e0" }}>
+                    <div style={{ width:`${(members.length / 10) * 100}%`,
+                      height:"100%", background:"#000080" }} />
+                  </div>
+                </div>
+              </div>
+              {isAdmin && (
+                <W95Button onClick={() => setModal({ type:"invite" })}
+                  className="!font-bold !text-[10px] shrink-0"
+                  style={{ background:"#000080", color:"white",
+                    borderColor:"white white #808080 #808080" } as React.CSSProperties}>
+                  ✉ Add Team Member
+                </W95Button>
+              )}
+            </div>
+          </Panel>
+        </div>
 
-        {/* Main area: table + sidebar */}
+        {/* Main area */}
         <div className="flex gap-3 items-start">
-          <UsersTable members={members} onAction={handleAction} />
-          <RoleReference />
+          {loading ? (
+            <div className="flex-1"><LoadingPane /></div>
+          ) : (
+            <UsersTable members={members} isAdmin={isAdmin}
+              onAction={(member, action) => setModal({ type:action, member })} />
+          )}
+          <RoleReference currentUserRole={currentUserRole} />
         </div>
 
         {/* Footer */}
         <div className="font-mono text-[9px] text-[#555] text-center pb-1"
-          style={{ borderTop: "1px solid #b0b0b0", paddingTop: "6px" }}>
-          AEGIS RADAR v2.1 — Team & Access &nbsp;|&nbsp; Role changes take effect on next login
-          &nbsp;|&nbsp; © 2025 AEGIS Systems, Cairo EG &nbsp;|&nbsp; All actions are audit-logged
+          style={{ borderTop:"1px solid #b0b0b0", paddingTop:"6px" }}>
+          AEGIS RADAR V3.3.3 — Team & Access &nbsp;|&nbsp; Role changes take effect on next login
+          &nbsp;|&nbsp; © 2026 EXE Solutions, Cairo EG
         </div>
       </div>
 
-      {/* ── Modals ── */}
-      {modal?.type === "add" && (
-        <AddMemberModal onClose={() => setModal(null)} onAdd={handleAdd} />
+      {/* Modals */}
+      {modal?.type === "invite" && (
+        <InviteModal onClose={() => setModal(null)}
+          onInvited={() => { loadTeam(); showToast("Invitation sent successfully", "success"); }} />
       )}
       {modal?.type === "changeRole" && (
         <ChangeRoleModal member={modal.member} onClose={() => setModal(null)}
-          onConfirm={(role) => handleRoleChange(modal.member, role)} />
+          onChanged={() => { loadTeam(); showToast(`Role updated for ${modal.member.name}`, "success"); }} />
       )}
-      {modal?.type === "confirm" && (
-        <ConfirmModal title={modal.title} message={modal.message} onClose={() => setModal(null)} />
+      {modal?.type === "remove" && (
+        <ConfirmModal
+          title={`Remove Member — ${modal.member.name}`}
+          message={`This will permanently remove "${modal.member.name}" (${modal.member.email}) from your organisation. They will immediately lose all access to AEGIS RADAR.`}
+          onClose={() => setModal(null)}
+          onConfirm={handleRemoveConfirm}
+          loading={confirmLoading} />
       )}
 
-      {/* Scrollbar styling */}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
       <style>{`
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         @media print {
-          body * { visibility: hidden; }
-          table, table * { visibility: visible; }
-          table { position: absolute; top: 0; left: 0; width: 100%; }
+          body * { visibility:hidden; }
+          table, table * { visibility:visible; }
+          table { position:absolute; top:0; left:0; width:100%; }
         }
-        ::-webkit-scrollbar { width: 16px; height: 16px; }
-        ::-webkit-scrollbar-track { background: #c0c0c0; }
-        ::-webkit-scrollbar-thumb {
-          background: #c0c0c0;
-          border-style: solid; border-width: 2px;
-          border-color: white white #808080 #808080;
-        }
-        ::-webkit-scrollbar-corner { background: #c0c0c0; }
       `}</style>
     </div>
   );

@@ -1,14 +1,54 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Keep environment variables out of version control
+.env
+
 # ========================================
 # AEGIS RADAR - .gitignore
 # ========================================
 
 .next/
-*.env
-.env
-.venv
-venv/
 node_modules
-/garbage
 
 # Frontend
 frontend/aegis-radar-app/node_modules/
@@ -23,7 +63,6 @@ frontend/aegis-radar-app/.next/
 # Backend
 backend/app/venv/
 backend/app/env/
-backend/app/database.py
 backend/__pycache__/
 backend/*.pyc
 backend/*.pyo
@@ -35,8 +74,6 @@ backend/scripts/generate_data.py
 backend/app/detection/           # ML core
 backend/node_modules/
 backend/.next/
-backend/app/models/seed.py
-backend/app/models/reseed.py
 
 # Database
 *.db
@@ -64,5 +101,4 @@ Thumbs.db
 
 # Temporary
 *.tmp
-
 

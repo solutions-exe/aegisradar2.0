@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AEGIS RADAR
+The First AI-Powered Fraud Detection Service For ONLINE Payments In Egypt And The Middle East.
 
-## Getting Started
+**AI-Powered Real-Time Fraud Detection System**  
+*Designed for Egyptian Businesses*
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 📋 Project Overview
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Aegis Radar is a modern **B2B SaaS fraud detection platform** with a distinctive retro Windows 95 aesthetic. It provides real-time transaction monitoring, risk scoring, and intelligent alerts using an ensemble of XGBoost and Isolation Forest models.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Key Features
+- Real-time fraud detection via API
+- Win95-inspired retro UI/UX
+- Multi-role access (Admin, Analyst, Viewer)
+- Live transaction monitoring
+- Security posture dashboard
+- Batch testing tools for demonstration
+- Email + In-app notifications
+- Merchant API key management
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+#### 🚀 Quick Start (Localhost)
 
-To learn more about Next.js, take a look at the following resources:
+1. Double-click `aegis_startup.bat` in the root folder
+2. Wait for both backend and frontend to start
+3. Open browser → [http://localhost:3000](http://localhost:3000)
+4. Login with:
+   - **Email**: `abdo@exe.com`
+   - **Password**: `1234-1234`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+##### 📁 Project Structure
+aegisradar/
+├── backend/                 # FastAPI + ML backend
+├── frontend/aegis-radar-app/# Next.js 16 frontend
+├── models/                  # Trained ML models (.pkl)
+├── scripts/                 # Testing and seeding scripts
+├── start_aegis.bat          # Master startup script
+├── README.md                # This file
+└── .env.example
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+###### 🛠 Tech Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Backend**: FastAPI, SQLAlchemy, PyMySQL, XGBoost, Isolation Forest  
+**Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS  
+**Database**: MySQL  
+**ML Models**: Ensemble (XGBoost + Isolation Forest)
+
+---
+
+###### 📋 Available Scripts
+
+- `start_aegis.bat` → Start both frontend + backend
+- `backend/scripts/batch_test.py` → Advanced testing
+- `backend/scripts/reset_and_seed.py` → Reset + seed database
+
+---
+**Made for Academic Porpuses.**  
+© 2026 BFCAI IS-Department

@@ -4,16 +4,18 @@
  * src/app/dashboard/layout.tsx
  *
  * Win95 application shell — shared across every page under /dashboard.
- * Renders the teal desktop, taskbar, outer window chrome, and sidebar.
- * Each page only needs to supply its own main-area content via {children}.
+ * Now includes the global NotificationBell (WebSocket fraud alerts).
  *
- * Usage:
- *   Place this file at  src/app/dashboard/layout.tsx
- *   Place Sidebar.tsx at src/components/Sidebar.tsx  (adjust import path below)
+ * Changes from previous version:
+ *   • Imported <NotificationBell /> from @/components/NotificationBell
+ *   • Bell + WS status dot placed in the taskbar between the clock and the
+ *     existing inset title block — fully visible on every dashboard page.
  */
 
 import { useState, useEffect } from "react";
-import Sidebar, { NavItem } from '@/components/Sidebar'; // adjust to wherever you place Sidebar.tsx
+import Sidebar from "@/components/Sidebar";
+import AegisLogo from "@/components/Aegislogo";
+import NotificationBell from "@/components/Notificationbell";
 
 // ─── Win95 beveled button (local — keeps layout self-contained) ───────────────
 
@@ -87,17 +89,41 @@ export default function DashboardLayout({
           height: "28px",
         }}
       >
+        {/* Start button */}
         <W95Button className="!font-bold flex items-center gap-1">
           <span>🪟</span> Start
         </W95Button>
+
         <div className="w-px h-4 bg-[#808080] mx-1" />
+
+        {/* Logo + app title */}
+        <AegisLogo size={20} variant="micro" />
         <div
           className="text-xs font-mono text-black px-2 py-0.5"
           style={{ border: "1px inset #808080", background: "#c0c0c0" }}
         >
-          AEGIS RADAR v2.1 — Dashboard
+          AEGIS RADAR v3.3.3 — Dashboard
         </div>
+
+        {/* Push everything after here to the right */}
         <div className="flex-1" />
+
+        {/*
+         * ── Notification Bell ──────────────────────────────────────────────
+         * Renders:
+         *   • Bell button with red unread badge
+         *   • WebSocket status dot (green/yellow/red)
+         *   • Slide-in notification panel (portaled to fixed position)
+         *   • Toast stack (fixed, bottom-right)
+         * Lives at the layout level so it persists across all dashboard pages.
+         */}
+        <div className="flex items-center gap-1.5 mr-1">
+          <NotificationBell />
+        </div>
+
+        <div className="w-px h-4 bg-[#808080]" />
+
+        {/* Clock */}
         <div
           className="text-xs font-mono px-2"
           style={{ border: "1px inset #808080" }}
@@ -126,7 +152,7 @@ export default function DashboardLayout({
             }}
           >
             <span className="text-white font-mono text-xs font-bold tracking-wide">
-              AEGIS RADAR v2.1 — AI Fraud Detection System [CIB Egypt]
+              AEGIS-RADAR-V3.3.3 — AI Fraud Detection System [EXE]
             </span>
             <div className="flex gap-1">
               {["_", "□", "✕"].map((btn) => (
@@ -155,13 +181,6 @@ export default function DashboardLayout({
 
           {/* ── Sidebar + page content ── */}
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            {/*
-             * Sidebar is rendered here at the layout level.
-             * The status widget prop is intentionally left empty here —
-             * pages that need live stats in the sidebar can either:
-             *   (a) use a context/store to push data up, or
-             *   (b) render their own status section inside their page content.
-             */}
             <Sidebar />
 
             {/* Page content fills the remaining space */}
@@ -185,7 +204,7 @@ export default function DashboardLayout({
           className="text-black"
           style={{ border: "1px inset #808080", padding: "1px 6px" }}
         >
-          FraudGuard Pro
+          Aegis Radar
         </div>
         <div
           className="text-black"
@@ -203,7 +222,6 @@ export default function DashboardLayout({
       </div>
 
       {/* Global styles */}
-      {/* Scrollbar styling */}
       <style>{`
         @media print {
           body * { visibility: hidden; }

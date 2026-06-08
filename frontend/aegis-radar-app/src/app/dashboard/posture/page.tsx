@@ -1,35 +1,18 @@
 "use client";
 
-/**
- * src/app/dashboard/posture/page.tsx
- *
- * AEGIS RADAR — Security Posture page.
- * Displays overall security score, risk breakdown, threat intelligence,
- * recommendations, and a 30-day trend chart.
- *
- * Sits inside layout.tsx which provides the Win95 shell + sidebar.
- * This file is fully self-contained: no external UI libraries required.
- */
+import { useCallback, useEffect, useState } from "react";
+import { getToken } from "@/lib/auth";
 
-import { useState } from "react";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 type TrendDir = "UP" | "DOWN" | "STABLE";
-
-interface RiskCard {
-  label: string;
-  score: number;      // 0–100 (higher = riskier)
-  icon: string;
-  detail: string;
-}
 
 interface Threat {
   id: string;
   name: string;
   count: number;
-  delta: number;      // % change vs last period
+  delta: number;
   severity: Priority;
   lastSeen: string;
 }
@@ -48,177 +31,30 @@ interface Insight {
   trend: TrendDir;
 }
 
-// ─── Static data (realistic for Egypt e-commerce) ────────────────────────────
+interface QuickStat {
+  label: string;
+  value: string;
+  color?: string;
+}
 
-const OVERALL_SCORE = 78;
+interface PostureApiResponse {
+  overallScore: number;
+  fraudPrevention: number;
+  authStrength: number;
+  modelAccuracy: number;
+  responseCoverage: number;
+  policyCompliance: number;
+  quickStats: QuickStat[];
+  riskCards: { label: string; score: number; icon: string; detail: string }[];
+  insights: Insight[];
+  threats: Threat[];
+  recommendations: Recommendation[];
+  trend: number[];
+  reportPeriod: string;
+  business: string;
+  lastScan: string;
+}
 
-const RISK_CARDS: RiskCard[] = [
-  {
-    label: "Transaction Risk",
-    score: 22,
-    icon: "💳",
-    detail: "2.3% of txns flagged this week — down from 3.1%",
-  },
-  {
-    label: "Behavioral Risk",
-    score: 34,
-    icon: "👤",
-    detail: "Unusual login bursts from Alexandria / Port Said nodes",
-  },
-  {
-    label: "Device Fingerprint",
-    score: 18,
-    icon: "🖥",
-    detail: "94 new unknown device hashes in last 24 h",
-  },
-  {
-    label: "Merchant Category",
-    score: 41,
-    icon: "🏪",
-    detail: "Electronics & mobile-top-up MCC elevated — common card-testing vector",
-  },
-  {
-    label: "Velocity Risk",
-    score: 29,
-    icon: "⚡",
-    detail: "3 accounts hit 15+ txn/hour threshold — auto-challenged",
-  },
-];
-
-const THREATS: Threat[] = [
-  {
-    id: "T01",
-    name: "Card Testing Attacks",
-    count: 312,
-    delta: +18,
-    severity: "CRITICAL",
-    lastSeen: "14 min ago",
-  },
-  {
-    id: "T02",
-    name: "Account Takeover (ATO)",
-    count: 87,
-    delta: -4,
-    severity: "HIGH",
-    lastSeen: "1 hr ago",
-  },
-  {
-    id: "T03",
-    name: "Friendly Fraud / Chargebacks",
-    count: 54,
-    delta: +2,
-    severity: "HIGH",
-    lastSeen: "3 hrs ago",
-  },
-  {
-    id: "T04",
-    name: "Promo / Coupon Abuse",
-    count: 140,
-    delta: +31,
-    severity: "MEDIUM",
-    lastSeen: "22 min ago",
-  },
-  {
-    id: "T05",
-    name: "SIM-Swap OTP Bypass",
-    count: 9,
-    delta: +9,
-    severity: "CRITICAL",
-    lastSeen: "6 hrs ago",
-  },
-  {
-    id: "T06",
-    name: "Reseller Bot Activity",
-    count: 228,
-    delta: -11,
-    severity: "MEDIUM",
-    lastSeen: "45 min ago",
-  },
-];
-
-const INSIGHTS: Insight[] = [
-  {
-    icon: "▲",
-    text: "Card-testing volume spiked +18% — correlates with recent Ramadan sale campaign on Jumia EG",
-    trend: "UP",
-  },
-  {
-    icon: "▼",
-    text: "ATO attempts declined after enforcing 2-FA on high-risk logins from new governorates",
-    trend: "DOWN",
-  },
-  {
-    icon: "►",
-    text: "72% of flagged transactions originate from mobile (Android); iOS share stable",
-    trend: "STABLE",
-  },
-  {
-    icon: "▲",
-    text: "Promo abuse surging — 31% increase tied to referral link farming via WhatsApp groups",
-    trend: "UP",
-  },
-  {
-    icon: "▼",
-    text: "False-positive rate improved from 1.8% → 1.1% after model recalibration last Tuesday",
-    trend: "DOWN",
-  },
-];
-
-const RECOMMENDATIONS: Recommendation[] = [
-  {
-    id: "R01",
-    priority: "CRITICAL",
-    title: "Enable CAPTCHA on guest checkout",
-    body: "Card-testing scripts exploit your frictionless guest flow. Adding invisible CAPTCHA on payment submission cuts bot throughput by ~80% with no UX impact.",
-    effort: "EASY",
-  },
-  {
-    id: "R02",
-    priority: "CRITICAL",
-    title: "Block SIM-swap window (30 min post-swap)",
-    body: "9 SIM-swap OTP bypasses detected. Partner with Vodafone EG / Orange EG API to flag recently ported numbers and enforce a cooling-off period before OTP delivery.",
-    effort: "HARD",
-  },
-  {
-    id: "R03",
-    priority: "HIGH",
-    title: "Velocity cap on referral code redemptions",
-    body: "WhatsApp farming rings are redeeming referral codes at 40–60×/hr per IP cluster. Limit redemptions to 3/device/day and 1 per verified phone number.",
-    effort: "EASY",
-  },
-  {
-    id: "R04",
-    priority: "HIGH",
-    title: "Flag electronics MCC transactions >EGP 2,500 for step-up auth",
-    body: "B.TECH & Noon Electronics are top chargeback MCC sources. Requiring OTP confirmation for high-value electronics orders reduces friendly-fraud exposure.",
-    effort: "MEDIUM",
-  },
-  {
-    id: "R05",
-    priority: "MEDIUM",
-    title: "Enrich device fingerprints with canvas + audio signals",
-    body: "Current fingerprinting misses 6% of known fraud devices that clear cookies. Adding canvas rendering and AudioContext hashes closes that gap.",
-    effort: "MEDIUM",
-  },
-  {
-    id: "R06",
-    priority: "LOW",
-    title: "Schedule weekly model re-training",
-    body: "AEGIS RADAR model was last retrained 18 days ago. Weekly retraining on fresh transaction data keeps precision above 97% as fraud patterns shift.",
-    effort: "EASY",
-  },
-];
-
-// 30-day trend: score per day (index 0 = 30 days ago, index 29 = today)
-const TREND_DATA = [
-  61, 63, 62, 65, 64, 67, 66, 68, 67, 70,
-  69, 71, 70, 72, 71, 73, 72, 74, 73, 75,
-  74, 76, 75, 77, 76, 77, 78, 77, 79, 78,
-];
-
-// ─── Primitive Win95 components ───────────────────────────────────────────────
-
-/** Classic beveled W95 button */
 function W95Button({
   children,
   active,
@@ -248,7 +84,6 @@ function W95Button({
   );
 }
 
-/** Blue Win95 title bar */
 function TitleBar({ title }: { title: string }) {
   return (
     <div
@@ -259,17 +94,16 @@ function TitleBar({ title }: { title: string }) {
         {title}
       </span>
       <div className="flex gap-1 shrink-0">
-        {["_", "□", "✕"].map((btn) => (
+        { ["_", "□", "✕"].map((btn) => (
           <W95Button key={btn} className="!text-[10px] !px-1 !py-0 leading-none">
             {btn}
           </W95Button>
-        ))}
+        )) }
       </div>
     </div>
   );
 }
 
-/** Gray raised panel (outset) */
 function Panel({
   children,
   className = "",
@@ -291,7 +125,6 @@ function Panel({
   );
 }
 
-/** Sunken inset panel */
 function InsetPanel({
   children,
   className = "",
@@ -316,7 +149,6 @@ function InsetPanel({
   );
 }
 
-/** Section wrapper: TitleBar + Panel body */
 function Section({
   title,
   children,
@@ -334,16 +166,12 @@ function Section({
   );
 }
 
-// ─── Helper: score → colour ───────────────────────────────────────────────────
-
-/** Map a 0–100 security score to a display colour */
 const scoreColor = (score: number) => {
   if (score >= 75) return "#00aa00";
   if (score >= 60) return "#cc8800";
   return "#cc0000";
 };
 
-/** Map a 0–100 risk level (higher = riskier) to a colour */
 const riskColor = (risk: number) => {
   if (risk <= 25) return "#00aa00";
   if (risk <= 50) return "#cc8800";
@@ -369,15 +197,11 @@ const TREND_ARROW: Record<TrendDir, string> = {
   STABLE: "►",
 };
 
-// ─── Sub-sections ─────────────────────────────────────────────────────────────
-
-/** Big security score dial */
-function SecurityScoreHeader() {
-  const color = scoreColor(OVERALL_SCORE);
+function SecurityScoreHeader({ posture }: { posture: PostureApiResponse }) {
+  const color = scoreColor(posture.overallScore);
   return (
-    <Section title="Security Posture Report  [CIB Egypt / E-Commerce Division]">
+    <Section title="Security Posture Report  [BFCAI / IS-Depatment]">
       <div className="flex items-center gap-6 flex-wrap">
-        {/* Score dial */}
         <InsetPanel className="bg-black p-4 flex flex-col items-center justify-center" style={{ minWidth: "140px" }}>
           <div className="text-[10px] font-mono text-[#888] mb-1 tracking-widest">
             SECURITY SCORE
@@ -386,25 +210,24 @@ function SecurityScoreHeader() {
             className="font-mono font-bold leading-none"
             style={{ fontSize: "56px", color, textShadow: `0 0 16px ${color}` }}
           >
-            {OVERALL_SCORE}
+            {posture.overallScore}
           </div>
           <div className="text-[10px] font-mono mt-1" style={{ color }}>
             / 100 — GOOD
           </div>
         </InsetPanel>
 
-        {/* Score breakdown bar */}
         <div className="flex-1 min-w-[200px]">
           <div className="font-mono text-xs text-black mb-2 font-bold">
             POSTURE RATING BREAKDOWN
           </div>
 
           {[
-            { label: "Fraud Prevention",    pct: 82 },
-            { label: "Auth Strength",       pct: 74 },
-            { label: "Model Accuracy",      pct: 91 },
-            { label: "Response Coverage",   pct: 68 },
-            { label: "Policy Compliance",   pct: 77 },
+            { label: "Fraud Prevention", pct: posture.fraudPrevention },
+            { label: "Auth Strength", pct: posture.authStrength },
+            { label: "Model Accuracy", pct: posture.modelAccuracy },
+            { label: "Response Coverage", pct: posture.responseCoverage },
+            { label: "Policy Compliance", pct: posture.policyCompliance },
           ].map(({ label, pct }) => (
             <div key={label} className="flex items-center gap-2 mb-1">
               <span className="font-mono text-[10px] text-black w-40 shrink-0">{label}</span>
@@ -428,22 +251,15 @@ function SecurityScoreHeader() {
           ))}
         </div>
 
-        {/* Quick stats column */}
         <div className="flex flex-col gap-1 min-w-[160px]">
-          {[
-            { label: "LAST SCAN",     value: "Today 09:14" },
-            { label: "OPEN ALERTS",   value: "7",          color: "#ff4444" },
-            { label: "RULES ACTIVE",  value: "143" },
-            { label: "MODEL VERSION", value: "v4.2.1-EG" },
-            { label: "DATA WINDOW",   value: "30 DAYS" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="flex justify-between gap-4">
-              <span className="font-mono text-[10px] text-[#444]">{label}:</span>
+          {posture.quickStats.map((stat) => (
+            <div key={stat.label} className="flex justify-between gap-4">
+              <span className="font-mono text-[10px] text-[#444]">{stat.label}:</span>
               <span
                 className="font-mono text-[10px] font-bold"
-                style={{ color: color ?? "#000" }}
+                style={{ color: stat.color ?? "#000" }}
               >
-                {value}
+                {stat.value}
               </span>
             </div>
           ))}
@@ -453,12 +269,11 @@ function SecurityScoreHeader() {
   );
 }
 
-/** 5 risk-category cards */
-function RiskBreakdown() {
+function RiskBreakdown({ cards }: { cards: PostureApiResponse["riskCards"] }) {
   return (
     <Section title="Risk Breakdown — by Category">
       <div className="grid grid-cols-5 gap-2 min-w-0">
-        {RISK_CARDS.map((card) => {
+        {cards.map((card) => {
           const col = riskColor(card.score);
           return (
             <div key={card.label} className="flex flex-col">
@@ -475,12 +290,7 @@ function RiskBreakdown() {
                 <div className="font-mono text-[9px] text-[#00cc00] font-bold leading-tight">
                   {card.label.toUpperCase()}
                 </div>
-
-                {/* Mini gauge */}
-                <div
-                  className="w-full bg-[#001100] mt-1"
-                  style={{ height: "6px", border: "1px solid #003300" }}
-                >
+                <div className="w-full bg-[#001100] mt-1" style={{ height: "6px", border: "1px solid #003300" }}>
                   <div
                     style={{
                       width: `${card.score}%`,
@@ -490,7 +300,6 @@ function RiskBreakdown() {
                     }}
                   />
                 </div>
-
                 <div className="font-mono text-[8px] text-[#555] leading-tight mt-1">
                   {card.detail}
                 </div>
@@ -503,16 +312,15 @@ function RiskBreakdown() {
   );
 }
 
-/** Key insights list */
-function KeyInsights() {
+function KeyInsights({ insights }: { insights: Insight[] }) {
   return (
     <Section title="Key Insights — Last 7 Days">
       <div className="flex flex-col gap-1">
-        {INSIGHTS.map((ins, i) => (
+        {insights.map((ins, index) => (
           <div
-            key={i}
+            key={index}
             className="flex items-start gap-2 py-1"
-            style={{ borderBottom: i < INSIGHTS.length - 1 ? "1px solid #b0b0b0" : "none" }}
+            style={{ borderBottom: index < insights.length - 1 ? "1px solid #b0b0b0" : "none" }}
           >
             <span
               className="font-mono text-xs font-bold shrink-0 mt-0.5"
@@ -528,11 +336,9 @@ function KeyInsights() {
   );
 }
 
-/** Top threats table */
-function TopThreats() {
+function TopThreats({ threats }: { threats: Threat[] }) {
   return (
     <Section title="Top Threats — Active Intelligence Feed">
-      {/* Table header */}
       <div
         className="grid font-mono text-[10px] font-bold text-black pb-1 mb-1"
         style={{
@@ -548,14 +354,14 @@ function TopThreats() {
         <span className="text-right">LAST SEEN</span>
       </div>
 
-      {THREATS.map((t, i) => (
+      {threats.map((t, index) => (
         <div
           key={t.id}
           className="grid font-mono text-[11px] text-black py-0.5 items-center"
           style={{
             gridTemplateColumns: "40px 1fr 70px 70px 80px 100px",
-            borderBottom: i < THREATS.length - 1 ? "1px solid #d0d0d0" : "none",
-            background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.04)",
+            borderBottom: index < threats.length - 1 ? "1px solid #d0d0d0" : "none",
+            background: index % 2 === 0 ? "transparent" : "rgba(0,0,0,0.04)",
           }}
         >
           <span className="text-[#808080]">{t.id}</span>
@@ -585,14 +391,13 @@ function TopThreats() {
   );
 }
 
-/** Personalised recommendations */
-function Recommendations() {
+function Recommendations({ recommendations }: { recommendations: Recommendation[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
     <Section title="Personalized Recommendations — Prioritized Action Items">
       <div className="flex flex-col gap-2">
-        {RECOMMENDATIONS.map((rec) => {
+        {recommendations.map((rec) => {
           const isOpen = expanded === rec.id;
           const pCol = PRIORITY_COLOR[rec.priority];
           return (
@@ -604,12 +409,10 @@ function Recommendations() {
                 background: isOpen ? "#f0f0f0" : "#e8e8e8",
               }}
             >
-              {/* Collapsed header — always visible */}
               <button
                 onClick={() => setExpanded(isOpen ? null : rec.id)}
                 className="flex items-center gap-2 px-2 py-1.5 text-left w-full font-mono text-[11px] text-black hover:bg-[#d8d8d8] focus:outline-none"
               >
-                {/* Priority badge */}
                 <span
                   className="font-bold text-[9px] px-1 py-0.5 shrink-0"
                   style={{
@@ -621,7 +424,6 @@ function Recommendations() {
                 >
                   {rec.priority}
                 </span>
-                {/* Effort badge */}
                 <span
                   className="font-mono text-[9px] px-1 py-0.5 shrink-0"
                   style={{
@@ -636,12 +438,11 @@ function Recommendations() {
                 <span className="shrink-0 text-[#808080]">{isOpen ? "▲" : "▼"}</span>
               </button>
 
-              {/* Expanded body */}
-              {isOpen && (
+              {isOpen ? (
                 <div className="px-3 pb-2 pt-1 font-mono text-[11px] text-black leading-snug border-t border-[#b0b0b0]">
                   [{rec.id}] {rec.body}
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
@@ -650,17 +451,22 @@ function Recommendations() {
   );
 }
 
-/** 30-day score trend bar chart */
-function TrendChart() {
-  const max = Math.max(...TREND_DATA);
-  const min = Math.min(...TREND_DATA);
+function TrendChart({ trend, overallScore }: { trend: number[]; overallScore: number }) {
+  if (trend.length === 0) {
+    return (
+      <Section title="Security Score Trend — Last 30 Days">
+        <div className="font-mono text-[11px] text-black">No trend data available.</div>
+      </Section>
+    );
+  }
+
+  const max = Math.max(...trend);
+  const min = Math.min(...trend);
 
   return (
     <Section title="Security Score Trend — Last 30 Days">
       <div className="flex flex-col gap-2">
-        {/* Y-axis labels + bars */}
         <div className="flex items-end gap-0.5" style={{ height: "120px" }}>
-          {/* Y-axis */}
           <div className="flex flex-col justify-between h-full mr-1 shrink-0">
             {[100, 75, 50, 25, 0].map((n) => (
               <span key={n} className="font-mono text-[8px] text-[#808080] leading-none">
@@ -669,17 +475,16 @@ function TrendChart() {
             ))}
           </div>
 
-          {/* Bars */}
-          {TREND_DATA.map((val, i) => {
-            const isToday = i === TREND_DATA.length - 1;
+          {trend.map((val, index) => {
+            const isToday = index === trend.length - 1;
             const heightPct = (val / 100) * 100;
             const col = scoreColor(val);
             return (
               <div
-                key={i}
+                key={index}
                 className="flex-1 flex flex-col justify-end relative group"
                 style={{ height: "100%" }}
-                title={`Day ${i + 1}: ${val}`}
+                title={`Day ${index + 1}: ${val}`}
               >
                 <div
                   style={{
@@ -695,32 +500,22 @@ function TrendChart() {
           })}
         </div>
 
-        {/* X-axis labels */}
         <div className="flex justify-between font-mono text-[8px] text-[#808080]">
           <span>30d ago</span>
           <span>15d ago</span>
-          <span>Today ({OVERALL_SCORE})</span>
+          <span>Today ({overallScore})</span>
         </div>
 
-        {/* Legend */}
         <div className="flex gap-4 font-mono text-[10px] text-black pt-1 border-t border-[#b0b0b0]">
           <span>
-            MIN:{" "}
-            <span style={{ color: scoreColor(min) }} className="font-bold">
-              {min}
-            </span>
+            MIN: <span style={{ color: scoreColor(min) }} className="font-bold">{min}</span>
           </span>
           <span>
-            MAX:{" "}
-            <span style={{ color: scoreColor(max) }} className="font-bold">
-              {max}
-            </span>
+            MAX: <span style={{ color: scoreColor(max) }} className="font-bold">{max}</span>
           </span>
           <span>
-            ΔPERIOD:{" "}
-            <span style={{ color: TREND_DATA[29] > TREND_DATA[0] ? "#008800" : "#cc0000" }} className="font-bold">
-              {TREND_DATA[29] > TREND_DATA[0] ? "+" : ""}
-              {TREND_DATA[29] - TREND_DATA[0]} pts
+            ΔPERIOD: <span style={{ color: trend[trend.length - 1] > trend[0] ? "#008800" : "#cc0000" }} className="font-bold">
+              {trend[trend.length - 1] > trend[0] ? "+" : ""}{trend[trend.length - 1] - trend[0]} pts
             </span>
           </span>
           <span className="ml-auto text-[#555]">
@@ -732,70 +527,173 @@ function TrendChart() {
   );
 }
 
-// ─── Page root ────────────────────────────────────────────────────────────────
-
 export default function PosturePage() {
+  const [posture, setPosture] = useState<PostureApiResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+ 
+
+// Replace the entire loadPosture function
+const loadPosture = useCallback(async () => {
+  setLoading(true);
+  setErrorMessage(null);
+  
+  try {
+    const token = getToken();
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/api/posture`, { headers });
+
+    if (res.status === 401) {
+      window.location.href = "/auth";
+      throw new Error("Session expired — redirecting to login");
+    }
+
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+
+    const data: PostureApiResponse = await res.json();
+    setPosture(data);
+  } catch (error) {
+    setErrorMessage(error instanceof Error ? error.message : "Unknown error");
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+  
+  useEffect(() => {
+    loadPosture();
+  }, []);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportCsv = () => {
+    if (!posture) return;
+    const rows = [
+      ["Threat ID", "Threat Name", "Count", "Delta", "Severity", "Last Seen"],
+      ...posture.threats.map((t) => [
+        t.id,
+        t.name,
+        t.count.toString(),
+        `${t.delta > 0 ? "+" : ""}${t.delta}%`,
+        t.severity,
+        t.lastSeen,
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "aegis-posture-threats.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleEmailSummary = () => {
+    if (!posture) return;
+    const subject = "AEGIS RADAR Security Posture Summary";
+    const body = [
+      `Overall Score: ${posture.overallScore}/100`,
+      `Fraud Prevention: ${posture.fraudPrevention}%`,
+      `Auth Strength: ${posture.authStrength}%`,
+      `Model Accuracy: ${posture.modelAccuracy}%`,
+      `Response Coverage: ${posture.responseCoverage}%`,
+      `Policy Compliance: ${posture.policyCompliance}%`,
+      "Top threats:",
+      ...posture.threats.slice(0, 3).map((t) => `- ${t.name}: ${t.count} cases (${t.severity})`),
+      "Recommendations:",
+      ...posture.recommendations.slice(0, 2).map((r) => `- ${r.title}`),
+    ].join("\n");
+
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   return (
     <div
       className="flex flex-col overflow-y-auto"
       style={{
         fontFamily: "'Courier New', Courier, monospace",
         background: "#c0c0c0",
-        // Custom scrollbar to match Win95 aesthetic
       }}
     >
-      {/* Toolbar row */}
       <div
         className="flex items-center gap-2 px-2 py-1.5 shrink-0"
         style={{ borderBottom: "2px solid #808080", background: "#c0c0c0" }}
       >
-        <W95Button className="!text-[10px]">🖨 Print Report</W95Button>
-        <W95Button className="!text-[10px]">💾 Export CSV</W95Button>
-        <W95Button className="!text-[10px]">📧 Email Summary</W95Button>
+        <W95Button className="!text-[10px]" onClick={handlePrint}>
+          🖨 Print Report
+        </W95Button>
+        <W95Button className="!text-[10px]" onClick={handleExportCsv}>
+          💾 Export CSV
+        </W95Button>
+        <W95Button className="!text-[10px]" onClick={handleEmailSummary}>
+          📧 Email Summary
+        </W95Button>
         <div className="w-px h-4 bg-[#808080] mx-1" />
-        <W95Button className="!text-[10px]">🔄 Refresh</W95Button>
+        <W95Button className="!text-[10px]" onClick={loadPosture}>
+          🔄 Refresh
+        </W95Button>
         <div className="flex-1" />
         <span className="font-mono text-[10px] text-[#444]">
-          Report period: 17 Apr 2025 – 17 May 2025 &nbsp;|&nbsp; Business: CIB Egypt E-Commerce
+          {posture?.reportPeriod ?? "Report period: loading..."} ;&nbsp;|&nbsp; {posture?.business ?? "Business: loading..."}
         </span>
       </div>
 
-      {/* Page body — stacked sections with padding */}
       <div className="flex flex-col gap-3 p-3">
-        {/* Row 1: Score header (full width) */}
-        <SecurityScoreHeader />
+        {errorMessage ? (
+          <div className="text-[#aa0000] font-mono text-[11px] p-3 bg-[#f7eaea] border border-[#ddbbbb]">
+            {errorMessage}
+          </div>
+        ) : null}
 
-        {/* Row 2: Risk breakdown (full width, 5-col grid inside) */}
-        <RiskBreakdown />
+        {loading && !posture ? (
+          <div className="text-[#004400] font-mono text-[12px] p-6 bg-[#f0f0f0] border border-[#808080]">
+            Loading security posture data...
+          </div>
+        ) : null}
 
-        {/* Row 3: Insights + Trend side by side */}
-        <div className="grid grid-cols-2 gap-3">
-          <KeyInsights />
-          <TrendChart />
-        </div>
+        {posture ? (
+          <>
+            <SecurityScoreHeader posture={posture} />
+            <RiskBreakdown cards={posture.riskCards} />
+            <div className="grid grid-cols-2 gap-3">
+              <KeyInsights insights={posture.insights} />
+              <TrendChart trend={posture.trend} overallScore={posture.overallScore} />
+            </div>
+            <TopThreats threats={posture.threats} />
+            <Recommendations recommendations={posture.recommendations} />
+          </>
+        ) : !loading ? (
+          <div className="text-[#555] font-mono text-[11px] p-4 bg-[#e8e8e8] border border-[#808080]">
+            No posture data available. Please refresh or verify that the backend is running.
+          </div>
+        ) : null}
 
-        {/* Row 4: Threats (full width) */}
-        <TopThreats />
-
-        {/* Row 5: Recommendations (full width, expandable) */}
-        <Recommendations />
-
-        {/* Footer note */}
         <div
           className="font-mono text-[9px] text-[#555] text-center pb-1"
           style={{ borderTop: "1px solid #b0b0b0", paddingTop: "6px" }}
         >
-          AEGIS RADAR v2.1 — AI-Powered Fraud Detection &nbsp;|&nbsp; Data refreshed every 15 min
-          &nbsp;|&nbsp; © 2025 AEGIS Systems, Cairo EG &nbsp;|&nbsp; All risk scores are indicative
+          AEGIS RADAR V3.3.3 — AI-Powered Fraud Detection &nbsp;|&nbsp; Data refreshed every 15 min
+          &nbsp;|&nbsp; © 2026 EXE Solutions, Cairo EG &nbsp;|&nbsp; All risk scores are indicative
         </div>
       </div>
 
-      {/* Scrollbar styling */}
       <style>{`
         @media print {
           body * { visibility: hidden; }
-          table, table * { visibility: visible; }
-          table { position: absolute; top: 0; left: 0; width: 100%; }
+          .print-area, .print-area * { visibility: visible; }
+          .print-area { position: absolute; top: 0; left: 0; width: 100%; }
         }
         ::-webkit-scrollbar { width: 16px; height: 16px; }
         ::-webkit-scrollbar-track { background: #c0c0c0; }

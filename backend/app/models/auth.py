@@ -5,7 +5,7 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    role: str = "analyst"  # admin or analyst
+    role: str = "viewer"  # admin or analyst
 
 class UserLogin(BaseModel):
     username: str
