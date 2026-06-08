@@ -15,7 +15,10 @@
 import { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import AegisLogo from "@/components/Aegislogo";
-import NotificationBell from "@/components/Notificationbell";
+import dynamic from "next/dynamic";
+const NotificationBell = dynamic(() => import("@/components/Notificationbell"), {
+  ssr: false,
+});
 
 // ─── Win95 beveled button (local — keeps layout self-contained) ───────────────
 
