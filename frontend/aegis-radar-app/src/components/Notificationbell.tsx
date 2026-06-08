@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { getToken } from '@/lib/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export interface FraudAlert {
   id: string;                 // generated client-side from Date.now()
@@ -222,7 +223,7 @@ function NotificationRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const token_ = getToken();
-const wsUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
+const wsUrl = API_BASE ? `${API_BASE.replace('http', 'ws')}/api/ws/alerts?token=${token_}`: `ws://aegis-radar-backend.onrender.com/api/ws/alerts?token=${token_}`;
 const ws_ = new WebSocket(wsUrl);
 const MAX_STORED = 50;
 const TOAST_DURATION_MS = 5000;

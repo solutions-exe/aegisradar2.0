@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getToken } from "@/lib/auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 type TrendDir = "UP" | "DOWN" | "STABLE";

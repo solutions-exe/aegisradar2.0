@@ -14,6 +14,8 @@ interface DetectResponse {
   timestamp: string;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 export default function BackendCheckPage() {
   const [result, setResult] = useState<DetectResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,7 @@ export default function BackendCheckPage() {
   };
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/detect", {
+    const res = await fetch(API_BASE, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
