@@ -43,7 +43,7 @@ sys.path.insert(0, str(BASE_DIR))
 
 load_dotenv()
 
-
+DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 
