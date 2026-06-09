@@ -74,7 +74,7 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
   Analyst: ["View all transaction data","View analytics","Manage fraud alerts","Flag transactions",
              "Contact customers & merchants","Export filtered reports"],
   Viewer:  ["View Transactions","View analytics & charts","Cannot take any actions",
-             "Cannot export data", "cannot manage alerts"],
+             "Cannot export data", "cannot manage alerts","cannot chnage settings"],
 };
 
 const ROLE_ICONS: Record<Role, string> = { Admin:"★", Analyst:"◆", Viewer:"●" };
