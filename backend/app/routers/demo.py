@@ -8,7 +8,7 @@ import time
 import uuid
 from datetime import datetime
 
-URL = "http://127.0.0.1:8000/detect"
+URL = "https://aegis-radar-backend.onrender.com/detect"
 
 router = APIRouter()
 
