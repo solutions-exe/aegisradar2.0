@@ -59,29 +59,30 @@ model_dir = BASE_DIR / "models"
 
 # Try new trained models first
 try:
-    xgb_new_path = model_dir / "xgboost_fraud_new.pkl"
-    iso_new_path = model_dir / "isolation_forest_new.pkl"
+    xgb_old_path = model_dir / "xgboost_fraud.pkl"
+    iso_old_path = model_dir / "isolation_forest.pkl"
 
+    if xgb_old_path.exists():
+        xgboost_fraud = joblib.load(xgb_old_path)
+        print(f"✅ Loaded OLD XGBoost model: {xgb_old_path.name}")
+    else:
+        # Fallback to old model
+     xgb_new_path = model_dir / "xgboost_fraud_new.pkl"
     if xgb_new_path.exists():
         xgboost_fraud = joblib.load(xgb_new_path)
         print(f"✅ Loaded NEW XGBoost model: {xgb_new_path.name}")
           
+        
+    iso_old_path = model_dir / "isolation_forest.pkl"
+    if iso_old_path.exists():
+            isolation_forest = joblib.load(iso_old_path)
+            print(f"✅ Loaded OLD Isolation Forest model: {iso_old_path.name}")
     else:
-        # Fallback to old model
-        xgb_old_path = model_dir / "xgboost_fraud.pkl"
-        if xgb_old_path.exists():
-            xgboost_fraud = joblib.load(xgb_old_path)
-            print(f"✅ Loaded OLD XGBoost model: {xgb_old_path.name}")
-
+        iso_new_path = model_dir / "isolation_forest_new.pkl"
     if iso_new_path.exists():
         isolation_forest = joblib.load(iso_new_path)
         print(f"✅ Loaded NEW Isolation Forest model: {iso_new_path.name}")
-    else:
-        iso_old_path = model_dir / "isolation_forest.pkl"
-        if iso_old_path.exists():
-            isolation_forest = joblib.load(iso_old_path)
-            print(f"✅ Loaded OLD Isolation Forest model: {iso_old_path.name}")
-
+       
 except Exception as e:
     print(f"❌ Error loading models: {e}")
 

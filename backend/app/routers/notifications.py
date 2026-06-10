@@ -27,8 +27,8 @@ class NotificationResponse(BaseModel):
 def send_email_notification(to_email: str, subject: str, alert_data: str):
     """Professional HTML email template"""
     try:
-        sender_email = "abdulrahman.r9205@gmail.com"      # ← Change this
-        app_password = "yklf toae praj ujxn"              # ← Change this
+        sender_email = "youremail@gmail.com"             # ← Change this
+        app_password = "your app password"               # ← Change this
 
         msg = MIMEMultipart("alternative")
         msg['From'] = f"Aegis Radar <{sender_email}>"
