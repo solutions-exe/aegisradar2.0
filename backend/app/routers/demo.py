@@ -80,18 +80,18 @@ def generate_demo_transactions(count: int, type: Optional[str] = None) -> List[D
         merchant, risk_type = random.choice(merchants)
 
         if risk_type == "highrisk":
-            amount = random.randint(12500, 68000)
+            amount = random.randint(15223, 86690)
         elif risk_type == "electronics":
-            amount = random.randint(3500, 18500)
+            amount = random.randint(2300, 13589)
         else:
-            amount = random.randint(280, 4800)
+            amount = random.randint(333, 8888)
 
-        velocity_1h = round(random.uniform(1.2, 27.5), 1)
-        velocity_24h = round(random.uniform(14.0, 148.0), 1)
+        velocity_1h = round(random.uniform(1.3, 9.3), 1)
+        velocity_24h = round(random.uniform(15.2, 26.8), 1)
 
         if risk_type == "highrisk":
-            velocity_1h = round(random.uniform(9.0, 28.0), 1)
-            velocity_24h = round(random.uniform(55.0, 148.0), 1)
+            velocity_1h = round(random.uniform(9.0, 31.0), 1)
+            velocity_24h = round(random.uniform(55.0, 126.0), 1)
 
         result.append(DemoTransaction(
             transaction_id=f"DEMO-{int(datetime.utcnow().timestamp() * 1000)}-{uuid.uuid4().hex[:8]}",
