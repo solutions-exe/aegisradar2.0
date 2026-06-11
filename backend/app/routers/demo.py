@@ -109,7 +109,7 @@ def generate_demo_transactions(count: int, type: Optional[str] = None) -> List[D
 def risk_level_from_score(score: float) -> str:
     if score >= 0.75:
         return "CRITICAL"
-    if score >= 0.5:
+    if score >= 0.6:
         return "HIGH"
     if score >= 0.25:
         return "MEDIUM"
