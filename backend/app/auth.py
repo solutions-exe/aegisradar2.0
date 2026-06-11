@@ -59,16 +59,37 @@ async def get_current_user(email: str = Depends(oauth2_scheme)):
 
 
 def require_role(allowed_roles: list[str]):
+    allowed = {role.strip().lower() for role in allowed_roles if role}
+    legacy_view_permissions = {
+        "view_transactions",
+        "view_analytics",
+        "view_posture",
+        "view_settings",
+        "view_history",
+        "view_notifications",
+    }
+
     async def role_checker(current_user: dict = Depends(get_current_user)):
-        user_role = current_user.get("role")
-        if user_role == "Admin":
+        user_role = (current_user.get("role") or "").strip()
+        user_role_key = user_role.lower()
+
+        # Admin always bypasses role restrictions.
+        if user_role_key == "admin":
             return current_user
-        if user_role in allowed_roles:
+
+        # Legacy behavior used by the dashboard routers: view-only endpoints
+        # were wired with permission-style names such as "view_transactions".
+        if allowed & legacy_view_permissions and user_role_key in {"analyst", "viewer"}:
             return current_user
+
+        if user_role_key in allowed:
+            return current_user
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Insufficient permissions. Required: {allowed_roles}"
         )
+
     return role_checker
 
 

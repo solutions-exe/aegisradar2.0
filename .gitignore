@@ -35,7 +35,7 @@ backend/app/detection/           # ML core
 backend/node_modules/
 backend/.next/
 backend/app/models/seed.py
-
+backend/tests/
 # Database
 *.db
 *.sqlite3
