@@ -18,6 +18,7 @@ interface Transaction {
   timestamp?: string;
   risk_score: number;
   is_fraud: boolean;
+  status: string;
   confidence: number;
   model_version: string;
 }
@@ -217,21 +218,41 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {filtered.map((tx, i) => (
-                <div
-                  key={i}
-                  className="leading-relaxed mb-1"
-                  style={{
-                    color: tx.is_fraud ? "#ff4444" : "#00ff00",
-                    textShadow: tx.is_fraud ? "0 0 6px #ff0000" : "0 0 4px #00ff00",
-                  }}
-                >
-                  [{tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}] {tx.transaction_id} |{" "}
-                  {tx.merchant.padEnd(18)} | EGP {tx.amount.toFixed(2).padStart(8)} |{" "}
-                  RISK: {(tx.risk_score * 100).toFixed(1)}%{" "}
-                  {tx.is_fraud ? "→ ⚠ FRAUD DETECTED" : "→ ✓ NORMAL"}
-                </div>
-              ))}
+              {filtered.map((tx, i) => {
+                const status = (tx.status || (tx.is_fraud ? "FRAUD" : "NORMAL")).toUpperCase();
+                const statusColor =
+                  status === "FRAUD"
+                    ? "#ff4444"
+                    : status === "REVIEW"
+                      ? "#ffaa00"
+                      : "#00ff00";
+                const statusGlow =
+                  status === "FRAUD"
+                    ? "0 0 6px #ff0000"
+                    : status === "REVIEW"
+                      ? "0 0 4px #ffaa00"
+                      : "0 0 4px #00ff00";
+
+                return (
+                  <div
+                    key={i}
+                    className="leading-relaxed mb-1"
+                    style={{
+                      color: statusColor,
+                      textShadow: statusGlow,
+                    }}
+                  >
+                    [{tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}] {tx.transaction_id} |{" "}
+                    {tx.merchant.padEnd(18)} | EGP {tx.amount.toFixed(2).padStart(8)} |{" "}
+                    RISK: {(tx.risk_score * 100).toFixed(1)}%{" "}
+                    {status === "FRAUD"
+                      ? "→ ⚠ FRAUD DETECTED"
+                      : status === "REVIEW"
+                        ? "→ ⏳ REVIEW"
+                        : "→ ✓ NORMAL"}
+                  </div>
+                );
+              })}
             </div>
           </InsetPanel>
         </div>

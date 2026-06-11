@@ -300,7 +300,7 @@ def heuristic_prediction(payload: dict) -> dict:
         "is_fraud": bool(is_fraud),
         "confidence": round(float(risk_score), 4),
         "model_version": "fallback_heuristic",
-        "status": "FRAUD" if is_fraud else "NORMAL",
+        "status": ("FRAUD" if is_fraud else ("REVIEW" if risk_score >= 0.33 else "NORMAL")),
         "message": MODEL_CONFIG["fallback_message"],
     }
 
@@ -336,7 +336,7 @@ def predict_with_models(payload: dict) -> dict:
         "is_fraud": bool(is_fraud),
         "confidence": round(risk_score, 4),
         "model_version": MODEL_VERSION,
-        "status": "FRAUD" if is_fraud else "NORMAL",
+        "status": ("FRAUD" if is_fraud else ("REVIEW" if risk_score >= 0.33 else "NORMAL")),
         "message": "Real ML prediction (XGBoost + Isolation Forest)",
     }
 
@@ -462,7 +462,7 @@ async def fraud_detection(
             amount=amount,
             risk_score=final_risk,
             is_fraud=is_fraud,
-            status="FRAUD" if is_fraud else "NORMAL"
+            status=("FRAUD" if is_fraud else ("REVIEW" if final_risk >= 0.33 else "NORMAL"))
         )
         db.add(new_tx)
         db.commit()

@@ -111,7 +111,7 @@ def risk_level_from_score(score: float) -> str:
         return "CRITICAL"
     if score >= 0.6:
         return "HIGH"
-    if score >= 0.25:
+    if score >= 0.33:
         return "MEDIUM"
     return "LOW"
 
