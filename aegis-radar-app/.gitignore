@@ -74,6 +74,7 @@ backend/scripts/generate_data.py
 backend/app/detection/           # ML core
 backend/node_modules/
 backend/.next/
+backend/test/test_auth_roles.py
 
 # Database
 *.db
