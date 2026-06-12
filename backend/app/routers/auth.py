@@ -1,123 +1,130 @@
-﻿from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from ast import Return
+import token
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from typing import Optional
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import APIRouter, Depends, HTTPException, status, Query, WebSocket
-from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
-from typing import Optional
-from app.database import  get_db ,Notification, User
-from sqlalchemy.orm import Session
+from jose import JWTError, jwt
+from sympy import python
 
 
 
+from app.auth import create_access_token, get_password_hash, verify_password
+from app.database import Organization, User, get_db
 
-# ====================== CONFIG ======================
-SECRET_KEY = "your-super-secret-key-change-this-in-production-2025"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
+router = APIRouter()
 
-# Argon2id - Modern secure password hasher
 ph = PasswordHasher()
 
-# ====================== JWT ======================
-class Token(BaseModel):
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+python
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "Analyst"
+    organization_id: Optional[int] = None   # Optional for now
+
+
+
+
+
+
+class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
-    role: Optional[str] = None
-
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    role: str
+    email: str
+    name: str
+    organization_id: int | None = None
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+def normalize_role(role: str) -> str:
+    normalized = (role or "Analyst").strip().lower()
+    if normalized == "admin":
+        return "Admin"
+    if normalized == "viewer":
+        return "Viewer"
+    return "Analyst"
 
 
-async def get_current_user(email: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(email, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        role: str = payload.get("role")
-        if email is None:
-            raise credentials_exception
-        return {"email": email, "role": role}
-    except JWTError:
-        raise credentials_exception
-
-
-def require_role(allowed_roles: list[str]):
-    async def role_checker(current_user: dict = Depends(get_current_user)):
-        user_role = current_user.get("role")
-        if user_role == "Admin":
-            return current_user
-        if user_role in allowed_roles:
-            return current_user
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions. Required: {allowed_roles}"
-        )
-    return role_checker
-
-
-# ====================== PASSWORD HASHING ======================
-def get_password_hash(password: str) -> str:
-    """Secure password hashing using Argon2id"""
-    return ph.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
-    try:
-        ph.verify(hashed_password, plain_password)
-        return True
-    except VerifyMismatchError:
-        return False
-    
-    # WebSocket compatible authentication
-async def get_current_user_ws(websocket: WebSocket, db: Session = Depends(get_db)):
-    """Simple token extraction for WebSocket connections"""
-    token = None
-    
-    # Try query parameter first (most common for WS)
-    token = websocket.query_params.get("token")
-    
-    # Fallback: try header
-    if not token:
-        token = websocket.headers.get("authorization")
-        if token and token.startswith("Bearer "):
-            token = token[7:]
-
-    if not token:
-        await websocket.close(code=4001, reason="Missing token")
-        return None
-
-    try:
-        # Validate JWT token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            await websocket.close(code=4001)
-            return None
-    except:
-        await websocket.close(code=4001, reason="Invalid token")
-        return None
-
-    user = db.query(User).filter(User.email == email).first()
+@router.post("/auth/login", response_model=AuthResponse)
+async def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
     if not user:
-        await websocket.close(code=4001, reason="User not found")
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
 
-    return {"email": user.email, "organization_id": user.organization_id, "role": user.role}
+    if not ph.verify(user.password_hash, payload.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    token = create_access_token(
+        {"sub": user.email, "role": user.role, "organization_id": user.organization_id}
+    )
+
+    return AuthResponse(
+        access_token=token,
+        role=user.role,
+        email=user.email,
+        name=user.name or user.email.split("@", 1)[0],
+        organization_id=user.organization_id,
+    )
+
+
+@router.post("/auth/register")
+async def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Register new user with secure Argon2id hashing"""
+    
+    # Check if email already exists
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Hash password using Argon2id (no need for manual truncation)
+    try:
+        password_hash = ph.hash(payload.password)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Password hashing failed")
+
+    new_user = User(
+        name=payload.name,
+        email=payload.email,
+        password_hash=password_hash,
+        role=payload.role or "Analyst",
+        status="Active",
+        organization_id=payload.organization_id  # Change this logic later for proper multi-tenant
+
+    )
+    
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = create_access_token(
+        {"sub": new_user.email, "role": new_user.role, "organization_id": new_user.organization_id}
+    )
+
+    return AuthResponse(
+        access_token=token,
+        role=new_user.role,
+        email=new_user.email,
+        name=new_user.name,
+        organization_id=new_user.organization_id,
+          )
+    
