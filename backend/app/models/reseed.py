@@ -39,7 +39,7 @@ def reset_and_seed_database():
         {"name": "yousef tarek", "email": "yousef@exe.com", "role": "Analyst"},
         {"name": "ahmed sakka", "email": "sakka@exe.com", "role": "Viewer"},
         {"name": "nader abdelaty", "email": "nader@exe.com", "role": "Viewer"},
-        {"name": "ziad khaled", "email": "ziad@exe.com", "role": "Viewer"},
+        {"name": "ziad samir", "email": "ziad@exe.com", "role": "Viewer"},
         {"name": "mohammed ghoniem", "email": "ghoniem@exe.com", "role": "Viewer"},
         {"name": "ahmed bahaa", "email": "bahaa@exe.com", "role": "Viewer"},
     ]
